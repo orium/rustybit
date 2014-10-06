@@ -37,16 +37,18 @@ mod message
 
     pub struct Version
     {
-        name_version : String,
+        name         : String,
+        version      : String,
         time         : ::time::Tm
     }
 
     impl Version
     {
-        pub fn new(name_version : String) -> Version
+        pub fn new(name : String, version : String) -> Version
         {
-            Version { name_version: name_version,
-                      time:         ::time::now_utc() }
+            Version { name:    name,
+                      version: version,
+                      time:    ::time::now_utc() }
         }
 
         /* Format the version according to BIP0014
@@ -54,7 +56,7 @@ mod message
          */
         fn name_version_bip0014(&self) -> String
         {
-            format!("/{}/",self.name_version)
+            format!("/{}:{}/",self.name,self.version)
         }
 
         pub fn serialize(&self) -> Vec<u8>
@@ -83,7 +85,8 @@ mod message
 
 fn send_version(socket : &mut TcpStream)
 {
-    let version = message::Version::new(config::name_version());
+    let version = message::Version::new(config::NAME.to_string(),
+                                        config::version());
 
     socket.write(version.serialize().as_slice());
 }
