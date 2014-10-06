@@ -1,5 +1,5 @@
 all: main.rs
-	rustc $<
+	rustc -A dead_code $<
 
 clean:
-	rm main
+	rm -f main
