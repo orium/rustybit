@@ -1,3 +1,5 @@
+extern crate time;
+
 pub struct Marshalling
 {
     buf: Vec<u8>
@@ -98,7 +100,12 @@ impl Marshalling
         }
     }
 
-    // date, netaddr, (checksum?)
+    pub fn write_timestamp(&mut self, time : &::time::Tm)
+    {
+        self.write_int64(time.to_timespec().sec);
+    }
+
+    // netaddr, (checksum?)
 
     pub fn get(&self) -> Vec<u8>
     {

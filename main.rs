@@ -22,13 +22,12 @@ mod config
 
     pub fn version() -> String
     {
-        format_args!(::std::fmt::format,"{}.{}-{}",VERSION_MAJOR,VERSION_MINOR,
-                                                   VERSION_DEV)
+        format!("{}.{}-{}",VERSION_MAJOR,VERSION_MINOR,VERSION_DEV)
     }
 
     pub fn name_version() -> String
     {
-        format_args!(::std::fmt::format,"{} {}",NAME,version())
+        format!("{} {}",NAME,version())
     }
 }
 
@@ -55,7 +54,7 @@ mod message
          */
         fn name_version_bip0014(&self) -> String
         {
-            format_args!(::std::fmt::format,"/{}/",self.name_version)
+            format!("/{}/",self.name_version)
         }
 
         pub fn serialize(&self) -> Vec<u8>
@@ -65,7 +64,7 @@ mod message
 
             msg.write_uint32(::config::PROTOCOL_VERSION);
             msg.write_uint64(::config::SERVICES as u64);
-            msg.write_int64(self.time.to_timespec().sec);
+            msg.write_timestamp(&self.time);
             // recipient addr
             // sender addr
             // node id
