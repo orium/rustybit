@@ -10,12 +10,12 @@ impl Marshalling
         Marshalling { buf: Vec::new() }
     }
 
-    pub fn write(&mut self, d: &[u8])
+    pub fn write(&mut self, d : &[u8])
     {
         self.buf.push_all(d);
     }
 
-    pub fn write_uint16(&mut self, v: u16)
+    pub fn write_uint16(&mut self, v : u16)
     {
         for i in range(0u,2)
         {
@@ -23,7 +23,7 @@ impl Marshalling
         }
     }
 
-    pub fn write_uint32(&mut self, v: u32)
+    pub fn write_uint32(&mut self, v : u32)
     {
         for i in range(0u,4)
         {
@@ -31,7 +31,7 @@ impl Marshalling
         }
     }
 
-    pub fn write_uint64(&mut self, v: u64)
+    pub fn write_uint64(&mut self, v : u64)
     {
         for i in range(0u,8)
         {
@@ -39,14 +39,14 @@ impl Marshalling
         }
     }
 
-    pub fn write_int64(&mut self, v: i64)
+    pub fn write_int64(&mut self, v : i64)
     {
         assert!(v >= 0);
 
         self.write_uint64(v as u64);
     }
 
-    pub fn write_varint(&mut self, v: u64)
+    pub fn write_varint(&mut self, v : u64)
     {
         match v
         {
@@ -69,13 +69,15 @@ impl Marshalling
         }
     }
 
-    pub fn write_str12(&mut self, str: &str)
+    pub fn write_str12(&mut self, str : &String)
     {
-        assert!(str.len() <= 12);
+        let bytes : &[u8] = str.as_bytes();
 
-        for i in range(0u,str.len())
+        assert!(bytes.len() <= 12);
+
+        for i in range(0u,bytes.len())
         {
-            self.buf.push(str[i]);
+            self.buf.push(bytes[i]);
         }
 
         for _ in range(str.len(),12)
@@ -84,13 +86,15 @@ impl Marshalling
         }
     }
 
-    pub fn write_varstr(&mut self, str: &str)
+    pub fn write_varstr(&mut self, str : &String)
     {
-        self.write_varint(str.len() as u64);
+        let bytes : &[u8] = str.as_bytes();
 
-        for i in range(0u,str.len())
+        self.write_varint(bytes.len() as u64);
+
+        for i in range(0u,bytes.len())
         {
-            self.buf.push(str[i]);
+            self.buf.push(bytes[i]);
         }
     }
 
@@ -99,6 +103,11 @@ impl Marshalling
     pub fn get(&self) -> Vec<u8>
     {
         self.buf.clone()
+    }
+
+    pub fn len(&self) -> uint
+    {
+        self.buf.len()
     }
 }
 
