@@ -72,7 +72,7 @@ mod message
             // last block
 
             header.write(MAIN_NET);
-            header.write_str12(&String::from_str("version"));
+            header.write_str12(&"version".to_string());
             header.write_uint32(msg.len() as u32);
             // checksum
 
