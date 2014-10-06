@@ -10,11 +10,17 @@ impl Marshalling
         Marshalling { buf: Vec::new() }
     }
 
-    // date, netaddr, str, (checksum?)
-
     pub fn write(&mut self, d: &[u8])
     {
         self.buf.push_all(d);
+    }
+
+    pub fn write_uint16(&mut self, v: u16)
+    {
+        for i in range(0u,2)
+        {
+            self.buf.push(((v>>8*i)&0xff) as u8);
+        }
     }
 
     pub fn write_uint32(&mut self, v: u32)
@@ -33,9 +39,66 @@ impl Marshalling
         }
     }
 
-    pub fn get<'a>(&'a self) -> &'a [u8]
+    pub fn write_int64(&mut self, v: i64)
     {
-        self.buf.as_slice()
+        assert!(v >= 0);
+
+        self.write_uint64(v as u64);
+    }
+
+    pub fn write_varint(&mut self, v: u64)
+    {
+        match v
+        {
+            0u64           .. 252u64             => {
+                self.buf.push(v as u8);
+            },
+            253u64         .. 0xffffu64             => {
+                self.buf.push(253u8);
+                self.write_uint16(v as u16);
+            },
+            0x10000u64     .. 0xffffffffu64         => {
+                self.buf.push(254u8);
+                self.write_uint32(v as u32);
+            },
+            0x100000000u64 .. 0xffffffffffffffffu64 => {
+                self.buf.push(255u8);
+                self.write_uint64(v);
+            },
+            _ => fail!("This should never happen!")
+        }
+    }
+
+    pub fn write_str12(&mut self, str: &str)
+    {
+        assert!(str.len() <= 12);
+
+        for i in range(0u,str.len())
+        {
+            self.buf.push(str[i]);
+        }
+
+        for _ in range(str.len(),12)
+        {
+            self.buf.push(0x00);
+        }
+    }
+
+    pub fn write_varstr(&mut self, str: &str)
+    {
+        self.write_varint(str.len() as u64);
+
+        for i in range(0u,str.len())
+        {
+            self.buf.push(str[i]);
+        }
+    }
+
+    // date, netaddr, (checksum?)
+
+    pub fn get(&self) -> Vec<u8>
+    {
+        self.buf.clone()
     }
 }
 
