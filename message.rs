@@ -4,10 +4,10 @@ static MAIN_NET: [u8, ..4] = [0xf9,0xbe,0xb4,0xd9];
 
 pub struct Version
 {
-    name         : String,
-    version      : String,
-    time         : time::Tm,
-    nounce       : u64
+    name    : String,
+    version : String,
+    time    : time::Tm,
+    nounce  : u64
 }
 
 impl Version

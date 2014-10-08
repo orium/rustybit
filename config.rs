@@ -6,7 +6,8 @@ pub static VERSION_DEV   : u8 = 0;
 
 pub static PROTOCOL_VERSION : u32 = 70002;
 
-enum Services {
+enum Services
+{
     NodeNetwork = 1 << 0,
 }
 
