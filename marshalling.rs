@@ -100,7 +100,7 @@ impl Marshalling
         }
     }
 
-    pub fn write_timestamp(&mut self, time : &::time::Tm)
+    pub fn write_timestamp(&mut self, time : &time::Tm)
     {
         self.write_int64(time.to_timespec().sec);
     }
