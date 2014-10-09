@@ -3,9 +3,9 @@ use std::io::net::ip::SocketAddr;
 use std::io::net::ip::Ipv4Addr;
 use std::io::IoError;
 
+mod config;
 mod marshalling;
 mod message;
-mod config;
 
 struct Peer
 {
@@ -13,19 +13,21 @@ struct Peer
     socket : Option<TcpStream>
 }
 
+static CONNECT_TIMEOUT : u64 = 5000; /* ms */
+
 impl Peer
 {
     pub fn new(addr : SocketAddr) -> Peer
     {
         Peer {
-            addr: addr,
+            addr:   addr,
             socket: None
         }
     }
 
     pub fn connect(&mut self) -> Result<(),IoError>
     {
-        match TcpStream::connect("192.168.1.2", 8333)
+        match TcpStream::connect_timeout(self.addr,CONNECT_TIMEOUT)
         {
             Ok(socket) =>
             {
