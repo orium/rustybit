@@ -51,6 +51,11 @@ impl Marshalling
         self.write_uint64(v as u64);
     }
 
+    pub fn write_bool(&mut self, b : bool)
+    {
+        self.write(if b { [1u8] } else { [0u8] });
+    }
+
     pub fn write_varint(&mut self, v : u64)
     {
         match v

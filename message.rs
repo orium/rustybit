@@ -45,6 +45,7 @@ impl Version
         header.write_uint64(self.nounce);
         msg.write_varstr(&self.name_version_bip0014());
         msg.write_uint32(324485); /* TODO last block */
+        msg.write_bool(true); /* relay transactions */
 
         header.write(MAIN_NET);
         header.write_str12(&"version".to_string());
