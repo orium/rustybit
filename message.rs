@@ -24,7 +24,7 @@ impl Version
         }
     }
 
-    /* Format the version according to BIP0014
+    /* Format the version according to BIP0014.
      * https://en.bitcoin.it/wiki/BIP_0014
      */
     fn name_version_bip0014(&self) -> String
@@ -39,12 +39,12 @@ impl Version
 
         msg.write_uint32(::config::PROTOCOL_VERSION);
         msg.write_uint64(::config::SERVICES as u64);
-        msg.write_timestamp(&self.time);
-        // recipient addr
-        // sender addr
+        msg.write_timestamp(self.time);
+        msg.write_netaddr(None,::config::SERVICES,None); /* recv addr */
+        msg.write_netaddr(None,::config::SERVICES,None); /* send addr */
         header.write_uint64(self.nounce);
         msg.write_varstr(&self.name_version_bip0014());
-        // last block
+        msg.write_uint32(324485); /* TODO last block */
 
         header.write(MAIN_NET);
         header.write_str12(&"version".to_string());

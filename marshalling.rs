@@ -1,5 +1,8 @@
 extern crate time;
 
+use std::io::net::ip::SocketAddr;
+use std::io::net::ip::{Ipv4Addr, Ipv6Addr};
+
 pub struct Marshalling
 {
     buf: Vec<u8>
@@ -100,12 +103,49 @@ impl Marshalling
         }
     }
 
-    pub fn write_timestamp(&mut self, time : &time::Tm)
+    pub fn write_timestamp(&mut self, time : time::Tm)
     {
         self.write_int64(time.to_timespec().sec);
     }
 
-    // netaddr, (checksum?)
+    // TODO maybe we should have a type netaddr
+    pub fn write_netaddr(&mut self,
+                         time     : Option<time::Tm>,
+                         services : ::config::Services,
+                         addr     : Option<SocketAddr>)
+    {
+        if time.is_some()
+        {
+            self.write_timestamp(time.unwrap());
+        }
+
+        self.write_uint64(services as u64);
+
+        match addr
+        {
+            Some(addr) =>
+            {
+                match addr.ip
+                {
+                    Ipv4Addr(b3, b2, b1, b0) =>
+                    {
+                        self.write([0u8, ..10]);
+                        self.write([0xffu8, ..2]);
+                        self.write([b3,b2,b1,b0]);
+                    },
+                    Ipv6Addr(..) => fail!("not implemented") /* TODO ipv6 */
+                };
+
+                self.write_uint16(addr.port);
+            }
+            None => {
+                self.write([0u8, ..10]);
+                self.write([0xffu8, ..2]);
+                self.write([0u8, ..4]); /* ip */
+                self.write_uint16(0);   /* port */
+            }
+        };
+    }
 
     pub fn get(&self) -> Vec<u8>
     {
