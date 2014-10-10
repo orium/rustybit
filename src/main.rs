@@ -5,6 +5,7 @@ use std::io::net::ip::Ipv4Addr;
 
 mod config;
 mod marshalling;
+mod crypto;
 mod message;
 mod peer;
 
@@ -26,8 +27,9 @@ fn spawn_thread_handle_peer(address : SocketAddr)
 
 fn main()
 {
-    let peers = [SocketAddr { ip: Ipv4Addr(192,168,1,2),  port: 8333 },
-                 //SocketAddr { ip: Ipv4Addr(93,93,135,12), port: 8333 }
+    let peers = [SocketAddr { ip: Ipv4Addr(127,0,0,1),  port: 8333 },
+                 // SocketAddr { ip: Ipv4Addr(192,168,1,2),  port: 8333 },
+                 // SocketAddr { ip: Ipv4Addr(93,93,135,12), port: 8333 }
                  ];
 
     for i in range(0,peers.len())

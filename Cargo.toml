@@ -3,3 +3,6 @@
 name = "rustybit"
 version = "0.0.0"
 authors = ["Diogo Sousa <diogogsousa@gmail.com"]
+
+[dependencies.openssl]
+git = "https://github.com/sfackler/rust-openssl.git"

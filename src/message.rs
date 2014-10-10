@@ -49,11 +49,6 @@ impl Header
         self.len as uint
     }
 
-    pub fn checksum(data : &Vec<u8>) -> u32
-    {
-        2596763594 // XXX
-    }
-
     pub fn serialize(&self) -> Vec<u8>
     {
         let mut header = ::marshalling::Marshalling::new();
@@ -83,11 +78,13 @@ impl Version
         // TODO: rnd should be a global variable. Is that possible in rust?
         // let mut rng : ::std::rand::OsRng = ::std::rand::OsRng::new().unwrap();
 
-        Version { name:        name,
-                  version:     version,
-                  time:        time::now_utc(),
-                  best_height: best_height,
-                  nounce:      0xababeface // TODO rng.gen()
+        Version
+        {
+            name:        name,
+            version:     version,
+            time:        time::now_utc(),
+            best_height: best_height,
+            nounce:      0xababeface // TODO rng.gen()
         }
     }
 
@@ -107,13 +104,7 @@ impl Version
 
         msg.write_uint32(::config::PROTOCOL_VERSION);
         msg.write_uint64(::config::SERVICES as u64);
-
-        // XXX
-        if false
-            { msg.write_timestamp(self.time); }
-        else
-            { msg.write_int64(1412833399i64); }
-
+        msg.write_timestamp(self.time);
         msg.write_netaddr(None,::config::SERVICES,None); /* recv addr */
         msg.write_netaddr(None,::config::SERVICES,None); /* send addr */
         msg.write_uint64(self.nounce);
@@ -124,7 +115,7 @@ impl Version
         header = Header::new(::config::MAIN_NET,
                              "version".to_string(),
                              msg.len() as u32,
-                             Header::checksum(&msg.get()));
+                             ::crypto::checksum(&msg.get()));
 
         header.serialize() + msg.get()
     }
