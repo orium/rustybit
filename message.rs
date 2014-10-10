@@ -103,6 +103,7 @@ impl Version
     pub fn serialize(&self) -> Vec<u8>
     {
         let mut msg = ::marshalling::Marshalling::new();
+        let header : Header;
 
         msg.write_uint32(::config::PROTOCOL_VERSION);
         msg.write_uint64(::config::SERVICES as u64);
@@ -120,10 +121,10 @@ impl Version
         msg.write_uint32(self.best_height);
         msg.write_bool(true); /* relay transactions */
 
-        let header : Header = Header::new(::config::MAIN_NET,
-                                          "version".to_string(),
-                                          msg.len() as u32,
-                                          Header::checksum(&msg.get()));
+        header = Header::new(::config::MAIN_NET,
+                             "version".to_string(),
+                             msg.len() as u32,
+                             Header::checksum(&msg.get()));
 
         header.serialize() + msg.get()
     }
