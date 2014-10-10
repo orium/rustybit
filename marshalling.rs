@@ -244,7 +244,22 @@ impl Unmarshalling
     /* TODO
     read_int64
     read_int32
-    read_bool
+     */
+
+    pub fn read_bool(&mut self) -> bool
+    {
+        let b : u8;
+
+        assert!(self.pos+1 <= self.buf.len());
+
+        b = *self.buf.get(self.pos);
+
+        self.pos += 1;
+
+        if b == 0u8 { false } else { true }
+    }
+
+    /*
     read_varint
      */
 
