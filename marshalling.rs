@@ -60,29 +60,29 @@ impl Marshalling
 
     pub fn write_bool(&mut self, b : bool)
     {
-        self.write(if b { [1u8] } else { [0u8] });
+        self.buf.push(if b { 1u8 } else { 0u8 });
     }
 
     pub fn write_varint(&mut self, v : u64)
     {
         match v
         {
-            0u64           .. 252u64             => {
+            0u64           ... 252u64             => {
                 self.buf.push(v as u8);
             },
-            253u64         .. 0xffffu64             => {
+            253u64         ... 0xffffu64             => {
                 self.buf.push(253u8);
                 self.write_uint16(v as u16);
             },
-            0x10000u64     .. 0xffffffffu64         => {
+            0x10000u64     ... 0xffffffffu64         => {
                 self.buf.push(254u8);
                 self.write_uint32(v as u32);
             },
-            0x100000000u64 .. 0xffffffffffffffffu64 => {
+            0x100000000u64 ... 0xffffffffffffffffu64 => {
                 self.buf.push(255u8);
                 self.write_uint64(v);
             },
-            _ => fail!("This should never happen!")
+            _ => unreachable!()
         }
     }
 
@@ -191,7 +191,7 @@ impl Unmarshalling
 
         for i in range(0,d.len())
         {
-            d[i] = *self.buf.get(self.pos);
+            d[i] = self.buf[self.pos];
             self.pos += 1;
         }
     }
@@ -204,7 +204,7 @@ impl Unmarshalling
 
         for i in range(0u,2)
         {
-            v |= *self.buf.get(self.pos) as u16 << 8*i;
+            v |= self.buf[self.pos] as u16 << 8*i;
             self.pos += 1;
         }
 
@@ -219,7 +219,7 @@ impl Unmarshalling
 
         for i in range(0u,4)
         {
-            v |= *self.buf.get(self.pos) as u32 << 8*i;
+            v |= self.buf[self.pos] as u32 << 8*i;
             self.pos += 1;
         }
 
@@ -234,7 +234,7 @@ impl Unmarshalling
 
         for i in range(0u,8)
         {
-            v |= *self.buf.get(self.pos) as u64 << 8*i;
+            v |= self.buf[self.pos] as u64 << 8*i;
             self.pos += 1;
         }
 
@@ -252,7 +252,7 @@ impl Unmarshalling
 
         assert!(self.pos+1 <= self.buf.len());
 
-        b = *self.buf.get(self.pos);
+        b = self.buf[self.pos];
 
         self.pos += 1;
 
@@ -271,12 +271,12 @@ impl Unmarshalling
 
         for i in range(0u, 12)
         {
-            if *self.buf.get(self.pos+i) == 0u8
+            if self.buf[self.pos+i] == 0u8
             {
                 break;
             }
 
-            str.push_char(*self.buf.get(self.pos+i) as char);
+            str.push(self.buf[self.pos+i] as char);
         }
 
         self.pos += 12;

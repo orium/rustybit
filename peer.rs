@@ -1,6 +1,8 @@
 use std::io::net::ip::SocketAddr;
 use std::io::TcpStream;
 
+use std::time::duration::Duration;
+
 use message::Header;
 
 macro_rules! try_or(
@@ -18,20 +20,19 @@ pub struct Peer
 }
 
 /* TODO inside Peer */
-static CONNECT_TIMEOUT : u64 = 5000; /* ms */
 static ERR : Result<(),()> = Err(());
 
 impl Peer
 {
     pub fn new(addr : SocketAddr) -> Peer
     {
-        Peer {
-            addr:   addr,
-            socket: None }
+        Peer { addr:   addr,
+               socket: None }
     }
 
     pub fn connect(&mut self) -> Result<(),()>
     {
+        let CONNECT_TIMEOUT : Duration = Duration::milliseconds(5000);
         let maybesocket = TcpStream::connect_timeout(self.addr,CONNECT_TIMEOUT);
 
         self.socket = Some(try_or!(maybesocket,ERR));
