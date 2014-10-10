@@ -138,7 +138,7 @@ impl Marshalling
                         self.write([0xffu8, ..2]);
                         self.write([b3,b2,b1,b0]);
                     },
-                    Ipv6Addr(..) => fail!("not implemented") /* TODO ipv6 */
+                    Ipv6Addr(..) => unimplemented!() /* TODO ipv6 */
                 };
 
                 self.write_uint16(addr.port);
@@ -164,3 +164,54 @@ impl Marshalling
 }
 
 // TODO: Unmarchalling
+pub struct Unmarshalling
+{
+    buf: Vec<u8>,
+    pos: uint
+}
+
+impl Unmarshalling
+{
+    pub fn new(data : &Vec<u8>) -> Unmarshalling
+    {
+        Unmarshalling { buf: data.clone(),
+                        pos: 0}
+    }
+
+    pub fn read_uint32(&mut self) -> u32
+    {
+        let mut v : u32 = 0;
+
+        assert!(self.pos+4 <= self.buf.len());
+
+        for i in range(0u,4)
+        {
+            v |= (*self.buf.get(self.pos+i) << 8*i) as u32;
+        }
+
+        self.pos += 4;
+
+        v
+    }
+
+    pub fn read_str12(&mut self) -> String
+    {
+        let mut str : String = String::new();
+
+        assert!(self.pos+12 <= self.buf.len());
+
+        for i in range(0u, 12)
+        {
+            if *self.buf.get(i+self.pos) == 0u8
+            {
+                break;
+            }
+
+            str.push_char(*self.buf.get(i+self.pos) as char);
+        }
+
+        self.pos += 12;
+
+        str
+    }
+}

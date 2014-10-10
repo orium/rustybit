@@ -7,7 +7,7 @@ pub struct Header
     network  : u32,
     command  : String,
     len      : u32,
-    checksum : [u8, ..4]
+    checksum : u32
 }
 
 impl Header
@@ -15,7 +15,7 @@ impl Header
     pub fn new(network  : u32,
                command  : String,
                len      : u32,
-               checksum : [u8, ..4]) -> Header
+               checksum : u32) -> Header
     {
         Header
         {
@@ -26,6 +26,24 @@ impl Header
         }
     }
 
+    pub fn unserialize(data : &Vec<u8>) -> Header
+    {
+        let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
+
+        Header
+        {
+            network:  unmarshalling.read_uint32(),
+            command:  unmarshalling.read_str12(),
+            len:      unmarshalling.read_uint32(),
+            checksum: unmarshalling.read_uint32()
+        }
+    }
+
+    pub fn checksum(data : &Vec<u8>) -> u32
+    {
+        0 // XXX
+    }
+
     pub fn serialize(&self) -> Vec<u8>
     {
         let mut header = ::marshalling::Marshalling::new();
@@ -33,7 +51,7 @@ impl Header
         header.write_uint32(self.network);
         header.write_str12(&self.command);
         header.write_uint32(self.len);
-        header.write(self.checksum);
+        header.write_uint32(self.checksum);
 
         header.get()
     }
@@ -76,7 +94,13 @@ impl Version
 
         msg.write_uint32(::config::PROTOCOL_VERSION);
         msg.write_uint64(::config::SERVICES as u64);
-        msg.write_timestamp(self.time);
+
+        // XXX
+        if false
+            { msg.write_timestamp(self.time); }
+        else
+            { msg.write_int64(1412833399i64); }
+
         msg.write_netaddr(None,::config::SERVICES,None); /* recv addr */
         msg.write_netaddr(None,::config::SERVICES,None); /* send addr */
         msg.write_uint64(self.nounce);
@@ -87,7 +111,7 @@ impl Version
         let header : Header = Header::new(MAIN_NET,
                                           "version".to_string(),
                                           msg.len() as u32,
-                                          [0u8, ..4]);
+                                          2596763594 as u32);
 
         header.serialize() + msg.get()
     }

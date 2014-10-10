@@ -12,6 +12,8 @@ fn main()
                                             port: 8333 };
     let mut orion : peer::Peer = peer::Peer::new(address);
 
-    orion.connect();
-    orion.send_version();
+    orion.connect().unwrap();
+    orion.send_version().unwrap();
+
+    orion.read_loop();
 }
