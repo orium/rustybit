@@ -30,6 +30,8 @@ impl Header
     {
         let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
 
+        assert!(data.len() == 24);
+
         Header
         {
             network:  unmarshalling.read_uint32(),
@@ -37,6 +39,16 @@ impl Header
             len:      unmarshalling.read_uint32(),
             checksum: unmarshalling.read_uint32()
         }
+    }
+
+    pub fn get_command<'a>(&'a self) -> &'a String
+    {
+        &self.command
+    }
+
+    pub fn get_payload_len(&self) -> uint
+    {
+        self.len as uint
     }
 
     pub fn checksum(data : &Vec<u8>) -> u32

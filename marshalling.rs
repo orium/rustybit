@@ -186,7 +186,7 @@ impl Unmarshalling
 
         for i in range(0u,4)
         {
-            v |= (*self.buf.get(self.pos+i) << 8*i) as u32;
+            v |= *self.buf.get(self.pos+i) as u32 << 8*i;
         }
 
         self.pos += 4;
@@ -202,12 +202,12 @@ impl Unmarshalling
 
         for i in range(0u, 12)
         {
-            if *self.buf.get(i+self.pos) == 0u8
+            if *self.buf.get(self.pos+i) == 0u8
             {
                 break;
             }
 
-            str.push_char(*self.buf.get(i+self.pos) as char);
+            str.push_char(*self.buf.get(self.pos+i) as char);
         }
 
         self.pos += 12;

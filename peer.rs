@@ -65,21 +65,18 @@ impl Peer
 
         loop
         {
-            let data : Vec<u8> = socket.read_exact(24).unwrap();
+            let data_hd : Vec<u8> = socket.read_exact(24).unwrap();
+            let header : ::message::Header = ::message::Header::unserialize(&data_hd);
+            let data_msg : Vec<u8> = socket.read_exact(header.get_payload_len()).unwrap();
 
-            for i in range(4u,12)
-            {
-                if *data.get(i) == 0u8 { println!(""); break; }
+            /* TODO check network
+             * TODO check checksum
+             */
 
-                print!("{}",*data.get(i) as char);
-            }
-
-            let i0 = *data.get(12+4) as uint;
-            let i1 = *data.get(12+4+1) as uint;
-            let i2 = *data.get(12+4+2) as uint;
-            let i3 = *data.get(12+4+3) as uint;
-
-            socket.read_exact(i0|(i1<<8)|(i2<<16)|(i3<<24)).unwrap();
+            println!("{}  command: {:9} len: {}",
+                     self.addr,
+                     header.get_command(),
+                     header.get_payload_len());
         };
 
         Ok(())
