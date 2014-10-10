@@ -8,6 +8,7 @@ pub struct Marshalling
     buf: Vec<u8>
 }
 
+#[allow(dead_code)]
 impl Marshalling
 {
     pub fn new() -> Marshalling
@@ -177,6 +178,7 @@ pub struct Unmarshalling
     pos: uint
 }
 
+#[allow(dead_code)]
 impl Unmarshalling
 {
     pub fn new(data : &Vec<u8>) -> Unmarshalling
