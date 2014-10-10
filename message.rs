@@ -1,7 +1,5 @@
 extern crate time;
 
-static MAIN_NET : u32 = 0xD9B4BEF9;
-
 pub struct Header
 {
     network  : u32,
@@ -120,7 +118,7 @@ impl Version
         msg.write_uint32(324485); /* TODO last block */
         msg.write_bool(true); /* relay transactions */
 
-        let header : Header = Header::new(MAIN_NET,
+        let header : Header = Header::new(::config::MAIN_NET,
                                           "version".to_string(),
                                           msg.len() as u32,
                                           2596763594 as u32);

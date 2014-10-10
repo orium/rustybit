@@ -4,6 +4,8 @@ pub static VERSION_MAJOR : u8 = 0;
 pub static VERSION_MINOR : u8 = 0;
 pub static VERSION_DEV   : u8 = 0;
 
+pub static MAIN_NET : u32 = 0xD9B4BEF9;
+
 pub static PROTOCOL_VERSION : u32 = 70002;
 
 pub enum Services
@@ -11,7 +13,7 @@ pub enum Services
     NodeNetwork = 1 << 0,
 }
 
-pub static SERVICES: Services = NodeNetwork;
+pub static SERVICES : Services = NodeNetwork;
 
 pub fn version() -> String
 {
