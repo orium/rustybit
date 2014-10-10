@@ -43,7 +43,8 @@ impl Peer
     {
         let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
         let version = ::message::Version::new(::config::NAME.to_string(),
-                                              ::config::version());
+                                              ::config::version(),
+                                              0);
 
         try_or!(socket.write(version.serialize().as_slice()),ERR);
 
