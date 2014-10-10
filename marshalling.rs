@@ -44,9 +44,16 @@ impl Marshalling
         }
     }
 
+    pub fn write_int32(&mut self, v : i32)
+    {
+        assert!(v >= 0); /* TODO: write negative values */
+
+        self.write_uint32(v as u32);
+    }
+
     pub fn write_int64(&mut self, v : i64)
     {
-        assert!(v >= 0);
+        assert!(v >= 0); /* TODO: write negative values */
 
         self.write_uint64(v as u64);
     }
@@ -178,6 +185,32 @@ impl Unmarshalling
                         pos: 0}
     }
 
+    pub fn read(&mut self, d : &mut [u8])
+    {
+        assert!(self.pos+d.len() <= self.buf.len());
+
+        for i in range(0,d.len())
+        {
+            d[i] = *self.buf.get(self.pos);
+            self.pos += 1;
+        }
+    }
+
+    pub fn read_uint16(&mut self) -> u16
+    {
+        let mut v : u16 = 0;
+
+        assert!(self.pos+2 <= self.buf.len());
+
+        for i in range(0u,2)
+        {
+            v |= *self.buf.get(self.pos) as u16 << 8*i;
+            self.pos += 1;
+        }
+
+        v
+    }
+
     pub fn read_uint32(&mut self) -> u32
     {
         let mut v : u32 = 0;
@@ -186,13 +219,34 @@ impl Unmarshalling
 
         for i in range(0u,4)
         {
-            v |= *self.buf.get(self.pos+i) as u32 << 8*i;
+            v |= *self.buf.get(self.pos) as u32 << 8*i;
+            self.pos += 1;
         }
-
-        self.pos += 4;
 
         v
     }
+
+    pub fn read_uint64(&mut self) -> u64
+    {
+        let mut v : u64 = 0;
+
+        assert!(self.pos+8 <= self.buf.len());
+
+        for i in range(0u,8)
+        {
+            v |= *self.buf.get(self.pos) as u64 << 8*i;
+            self.pos += 1;
+        }
+
+        v
+    }
+
+    /* TODO
+    read_int64
+    read_int32
+    read_bool
+    read_varint
+     */
 
     pub fn read_str12(&mut self) -> String
     {
@@ -214,4 +268,10 @@ impl Unmarshalling
 
         str
     }
+
+    /* TODO
+    read_varstr
+    read_timestamp
+    read_netaddr
+     */
 }
