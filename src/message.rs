@@ -1,5 +1,10 @@
 extern crate time;
 
+pub enum Message
+{
+    MsgVersion(Version),
+}
+
 pub struct Header
 {
     network  : u32,
