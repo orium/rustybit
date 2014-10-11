@@ -75,7 +75,7 @@ impl Peer
         data_hd = try_or!(socket.read_exact(24),ERR_FATAL);
         header = Header::unserialize(&data_hd);
 
-        if (header.get_payload_len() >= PAYLOAD_MAX_SIZE)
+        if header.get_payload_len() >= PAYLOAD_MAX_SIZE
         {
             println!("message payload length too big");
             return ERR_OK;
@@ -86,7 +86,7 @@ impl Peer
         /* TODO check network
          */
 
-        if (::crypto::checksum(&data_msg) != header.get_checksum())
+        if ::crypto::checksum(&data_msg) != header.get_checksum()
         {
             println!("invalid checksum");
             return ERR_OK;

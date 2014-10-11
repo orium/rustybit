@@ -124,20 +124,16 @@ impl Marshalling
         self.write_int64(time.to_timespec().sec);
     }
 
-    // TODO maybe we should have a type netaddr
-    pub fn write_netaddr(&mut self,
-                         time     : Option<time::Tm>,
-                         services : ::config::Services,
-                         addr     : Option<SocketAddr>)
+    pub fn write_netaddr(&mut self, netaddr : &::message::NetAddr)
     {
-        if time.is_some()
+        if netaddr.time.is_some()
         {
-            self.write_timestamp(time.unwrap());
+            self.write_timestamp(netaddr.time.unwrap());
         }
 
-        self.write_uint64(services as u64);
+        self.write_uint64(netaddr.services as u64);
 
-        match addr
+        match netaddr.addr
         {
             Some(addr) =>
             {

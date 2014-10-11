@@ -3,6 +3,8 @@ extern crate time;
 use std::fmt::Show;
 use std::fmt::Formatter;
 
+use std::io::net::ip::SocketAddr;
+
 pub enum Message
 {
     MsgVersion(Version),
@@ -93,12 +95,39 @@ impl Show for Header
     }
 }
 
+pub struct NetAddr
+{
+    pub time     : Option<time::Tm>,
+    pub services : ::config::Services,
+    pub addr     : Option<SocketAddr>
+}
+
+impl NetAddr
+{
+    pub fn new(time     : Option<time::Tm>,
+               services : ::config::Services,
+               addr     : Option<SocketAddr>) -> NetAddr
+    {
+        NetAddr
+        {
+            time:     time,
+            services: services,
+            addr:     addr
+        }
+    }
+}
+
 pub struct Version
 {
+    proto_ver   : u32,
+    services    : ::config::Services,
     version     : String,
     time        : time::Tm,
+    addr_recv   : NetAddr,
+    addr_send   : NetAddr,
     best_height : u32,
-    nounce      : u64
+    nounce      : u64,
+    relay       : bool
 }
 
 impl Version
@@ -110,40 +139,59 @@ impl Version
 
         Version
         {
+            proto_ver:   ::config::PROTOCOL_VERSION,
+            services:    ::config::SERVICES,
             version:     version,
             time:        time::now_utc(),
+            addr_recv:   NetAddr::new(None,::config::SERVICES,None),
+            addr_send:   NetAddr::new(None,::config::SERVICES,None),
             best_height: best_height,
-            nounce:      0xababeface // TODO rng.gen()
+            nounce:      0xababeface, // TODO rng.gen()
+            relay:       true
         }
     }
 
     pub fn unserialize(data : &Vec<u8>) -> Version
     {
         let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
+        let proto_ver : u32;
+        let services : ::config::Services;
         let version : String;
         let time : time::Tm;
+        let addr_recv: NetAddr;
+        let addr_send: NetAddr;
         let best_height : u32;
         let nounce : u64;
+        let relay : bool;
 
-        unmarshalling.read_uint32();
-        unmarshalling.read_uint64();
-        unmarshalling.skip(8); /* TODO */ /* timestamp */
+        proto_ver = unmarshalling.read_uint32();
+        services = unmarshalling.read_uint64();
         time = time::empty_tm();
-        unmarshalling.skip(26); /* TODO */ /* recv addr */
-        unmarshalling.skip(26); /* TODO */ /* send addr */
-        nounce=unmarshalling.read_uint64();
-        version=unmarshalling.read_varstr();
-        best_height=unmarshalling.read_uint32();
-        unmarshalling.read_bool();
+        unmarshalling.skip(8);  /* TODO  timestamp */
+        addr_recv = NetAddr::new(None,::config::SERVICES,None);
+        unmarshalling.skip(26); /* TODO   recv addr */
+        addr_send = NetAddr::new(None,::config::SERVICES,None);
+        unmarshalling.skip(26); /* TODO   send addr */
+        nounce = unmarshalling.read_uint64();
+        version = unmarshalling.read_varstr();
+        best_height = unmarshalling.read_uint32();
+        relay = unmarshalling.read_bool();
 
+        assert!(services == ::config::None as u64
+                || services == ::config::NodeNetwork as u64);
         assert!(unmarshalling.is_end());
 
         Version
         {
+            proto_ver:   proto_ver,
+            services:    services,
             version:     version,
             time:        time,
+            addr_recv:   addr_recv,
+            addr_send:   addr_send,
             best_height: best_height,
-            nounce:      nounce
+            nounce:      nounce,
+            relay:       relay
         }
     }
 
@@ -153,20 +201,17 @@ impl Version
         let mut msg = ::marshalling::Marshalling::new();
         let header : Header;
 
-        /* TODO everything here should be in the struct.
-         * eg. self.services
-         */
-        msg.write_uint32(::config::PROTOCOL_VERSION);
-        msg.write_uint64(::config::SERVICES as u64);
+        msg.write_uint32(self.proto_ver);
+        msg.write_uint64(self.services);
         msg.write_timestamp(self.time);
-        msg.write_netaddr(None,::config::SERVICES,None); /* recv addr */
-        msg.write_netaddr(None,::config::SERVICES,None); /* send addr */
+        msg.write_netaddr(&self.addr_recv);
+        msg.write_netaddr(&self.addr_send);
         msg.write_uint64(self.nounce);
         msg.write_varstr(&self.version);
         msg.write_uint32(self.best_height);
-        msg.write_bool(true); /* relay transactions */
+        msg.write_bool(self.relay);
 
-        header = Header::new(::config::MAIN_NET,
+        header = Header::new(::config::NETWORK,
                              "version".to_string(),
                              msg.len() as u32,
                              ::crypto::checksum(&msg.get()));
@@ -179,7 +224,10 @@ impl Show for Version
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
-        try!(write!(f, "Version : {}\n", self.version));
+        try!(write!(f, "Proto ver   : {}\n", self.proto_ver));
+        try!(write!(f, "Version     : {}\n", self.version));
+        try!(write!(f, "Best height : {}\n", self.best_height));
+        try!(write!(f, "Relay       : {}", self.relay));
 
         Ok(())
     }

@@ -4,16 +4,24 @@ pub static VERSION_MAJOR : u8 = 0;
 pub static VERSION_MINOR : u8 = 0;
 pub static VERSION_FIXES : u8 = 0;
 
-pub static MAIN_NET : u32 = 0xD9B4BEF9;
+pub enum Network
+{
+    MainNet = 0xD9B4BEF9
+}
+
+pub static NETWORK : u32 = MainNet as u32; /* This should be of type Network */
 
 pub static PROTOCOL_VERSION : u32 = 70002;
 
-pub enum Services
+pub enum Service
 {
+    None        = 0,
     NodeNetwork = 1 << 0,
 }
 
-pub static SERVICES : Services = NodeNetwork;
+pub type Services = u64;
+
+pub static SERVICES : Services = NodeNetwork as Services;
 
 pub fn version() -> String
 {
