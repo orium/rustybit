@@ -37,3 +37,10 @@ fn main()
         spawn_thread_handle_peer(peers[i]);
     }
 }
+
+/* TODO:
+ *
+ * There are asserts that need to be verified in runtime and handled
+ *       gracefully instead of terminating the program
+ *       (eg. Unmarshalling::read_strvar()).
+ */

@@ -30,6 +30,7 @@ pub struct Peer
 
 /* TODO inside Peer */
 static ERR : Result<(),()> = Err(());
+static PAYLOAD_MAX_SIZE : uint = 4*(1<<20); /* 4MB */
 
 impl Peer
 {
@@ -52,9 +53,7 @@ impl Peer
     pub fn send_version(&mut self) -> Result<(),()>
     {
         let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
-        let version = ::message::Version::new(::config::NAME.to_string(),
-                                              ::config::version(),
-                                              0);
+        let version = Version::new(::config::name_version_bip0014(),0);
 
         try_or!(socket.write(version.serialize().as_slice()),ERR);
 
@@ -63,7 +62,7 @@ impl Peer
 
     /* Returns Err(true) if fatal error
      */
-    pub fn read_message(&mut self) -> Result<::message::Message,bool>
+    pub fn read_message(&mut self) -> Result<Message,bool>
     {
         let ERR_FATAL = Err(true);
         let ERR_OK    = Err(false);
@@ -76,12 +75,24 @@ impl Peer
         data_hd = try_or!(socket.read_exact(24),ERR_FATAL);
         header = Header::unserialize(&data_hd);
 
-        /* TODO check max msg size */
+        if (header.get_payload_len() >= PAYLOAD_MAX_SIZE)
+        {
+            println!("message payload length too big");
+            return ERR_OK;
+        }
+
         data_msg = try_or!(socket.read_exact(header.get_payload_len()),ERR_FATAL);
 
         /* TODO check network
-         * TODO check checksum
          */
+
+        if (::crypto::checksum(&data_msg) != header.get_checksum())
+        {
+            println!("invalid checksum");
+            return ERR_OK;
+        }
+
+        println!("{}\n",header);
 
         println!("{}  {}  \tcommand: {:9} len: {}",
                  time::now().rfc822z(),
@@ -89,7 +100,18 @@ impl Peer
                  header.get_command(),
                  header.get_payload_len());
 
-        ERR_OK
+        match header.get_command().as_slice()
+        {
+            "version" =>
+            {
+                let version : Version;
+
+                version = Version::unserialize(&data_msg);
+
+                Ok(MsgVersion(version))
+            },
+            _ => ERR_OK
+        }
     }
 
     pub fn read_loop(&mut self) -> Result<(),()>
@@ -112,7 +134,7 @@ impl Peer
             {
                 MsgVersion(version) =>
                 {
-                    println!("got a version");
+                    println!("{}",version);
                 }
             };
         };

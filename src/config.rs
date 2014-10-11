@@ -25,3 +25,11 @@ pub fn name_version() -> String
 {
     format!("{} {}",NAME,version())
 }
+
+/* Format the version according to BIP0014.
+ * https://en.bitcoin.it/wiki/BIP_0014
+ */
+pub fn name_version_bip0014() -> String
+{
+    format!("/{}:{}/",NAME,version())
+}

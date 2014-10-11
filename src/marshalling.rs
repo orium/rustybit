@@ -3,6 +3,9 @@ extern crate time;
 use std::io::net::ip::SocketAddr;
 use std::io::net::ip::{Ipv4Addr, Ipv6Addr};
 
+static VARSTR_MAX_LENGTH : uint = 256;
+static VARSTR_SAFE_CHARS : &'static str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890 .,;_/:?@";
+
 pub struct Marshalling
 {
     buf: Vec<u8>
@@ -151,7 +154,8 @@ impl Marshalling
 
                 self.write_uint16(addr.port);
             }
-            None => {
+            None =>
+            {
                 self.write([0u8, ..10]);
                 self.write([0xffu8, ..2]);
                 self.write([0u8, ..4]); /* ip */
@@ -195,6 +199,12 @@ impl Unmarshalling
             d[i] = self.buf[self.pos];
             self.pos += 1;
         }
+    }
+
+    /* TODO XXX remove when not needed */
+    pub fn skip(&mut self, s : uint)
+    {
+        self.pos += s;
     }
 
     pub fn read_uint16(&mut self) -> u16
@@ -260,9 +270,38 @@ impl Unmarshalling
         if b == 0u8 { false } else { true }
     }
 
-    /*
-    read_varint
-     */
+    pub fn read_varint(&mut self) -> u64
+    {
+        let first : u8;
+
+        assert!(self.pos+1 <= self.buf.len());
+
+        first = self.buf[self.pos];
+
+        self.pos += 1;
+
+        match first
+        {
+            0u8 ... 252u8 => first as u64,
+            253u8         => self.read_uint16() as u64,
+            254u8         => self.read_uint32() as u64,
+            255u8         => self.read_uint64(),
+            _             => unreachable!()
+        }
+    }
+
+    fn is_string_sane(str : &String) -> bool
+    {
+        for ch in str.as_slice().chars()
+        {
+            if !VARSTR_SAFE_CHARS.contains_char(ch)
+            {
+                return false;
+            }
+        }
+
+        true
+    }
 
     pub fn read_str12(&mut self) -> String
     {
@@ -282,12 +321,41 @@ impl Unmarshalling
 
         self.pos += 12;
 
+        /* TODO Must be all zeros after the first zero */
+
+        assert!(Unmarshalling::is_string_sane(&str));
+
+        str
+    }
+
+    pub fn read_varstr(&mut self) -> String
+    {
+        let mut str : String = String::new();
+        let len = self.read_varint() as uint;
+
+        assert!(len <= VARSTR_MAX_LENGTH);
+        assert!(self.pos+len <= self.buf.len());
+
+        for _ in range(0,len)
+        {
+            str.push(self.buf[self.pos] as char);
+            self.pos += 1;
+
+            assert!(self.pos <= self.buf.len());
+        }
+
+        assert!(Unmarshalling::is_string_sane(&str));
+
         str
     }
 
     /* TODO
-    read_varstr
     read_timestamp
     read_netaddr
      */
+
+    pub fn is_end(&self) -> bool
+    {
+        self.pos == self.buf.len()
+    }
 }

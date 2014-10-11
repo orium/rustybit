@@ -1,5 +1,8 @@
 extern crate time;
 
+use std::fmt::Show;
+use std::fmt::Formatter;
+
 pub enum Message
 {
     MsgVersion(Version),
@@ -29,19 +32,9 @@ impl Header
         }
     }
 
-    pub fn unserialize(data : &Vec<u8>) -> Header
+    pub fn get_checksum(&self) -> u32
     {
-        let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
-
-        assert!(data.len() == 24);
-
-        Header
-        {
-            network:  unmarshalling.read_uint32(),
-            command:  unmarshalling.read_str12(),
-            len:      unmarshalling.read_uint32(),
-            checksum: unmarshalling.read_uint32()
-        }
+        self.checksum
     }
 
     pub fn get_command<'a>(&'a self) -> &'a String
@@ -52,6 +45,26 @@ impl Header
     pub fn get_payload_len(&self) -> uint
     {
         self.len as uint
+    }
+
+    pub fn unserialize(data : &Vec<u8>) -> Header
+    {
+        let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
+        let header : Header;
+
+        assert!(data.len() == 24);
+
+        header = Header
+        {
+            network:  unmarshalling.read_uint32(),
+            command:  unmarshalling.read_str12(),
+            len:      unmarshalling.read_uint32(),
+            checksum: unmarshalling.read_uint32()
+        };
+
+        assert!(unmarshalling.is_end());
+
+        header
     }
 
     pub fn serialize(&self) -> Vec<u8>
@@ -67,9 +80,21 @@ impl Header
     }
 }
 
+impl Show for Header
+{
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    {
+        try!(write!(f, "Network : {:08x}\n", self.network));
+        try!(write!(f, "Command : {}\n", self.command));
+        try!(write!(f, "Len     : {}\n", self.len));
+        try!(write!(f, "Checksum: {:08x}", self.checksum));
+
+        Ok(())
+    }
+}
+
 pub struct Version
 {
-    name        : String,
     version     : String,
     time        : time::Tm,
     best_height : u32,
@@ -78,14 +103,13 @@ pub struct Version
 
 impl Version
 {
-    pub fn new(name : String, version : String, best_height : u32) -> Version
+    pub fn new(version : String, best_height : u32) -> Version
     {
         // TODO: rnd should be a global variable. Is that possible in rust?
         // let mut rng : ::std::rand::OsRng = ::std::rand::OsRng::new().unwrap();
 
         Version
         {
-            name:        name,
             version:     version,
             time:        time::now_utc(),
             best_height: best_height,
@@ -93,12 +117,34 @@ impl Version
         }
     }
 
-    /* Format the version according to BIP0014.
-     * https://en.bitcoin.it/wiki/BIP_0014
-     */
-    fn name_version_bip0014(&self) -> String
+    pub fn unserialize(data : &Vec<u8>) -> Version
     {
-        format!("/{}:{}/",self.name,self.version)
+        let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
+        let version : String;
+        let time : time::Tm;
+        let best_height : u32;
+        let nounce : u64;
+
+        unmarshalling.read_uint32();
+        unmarshalling.read_uint64();
+        unmarshalling.skip(8); /* TODO */ /* timestamp */
+        time = time::empty_tm();
+        unmarshalling.skip(26); /* TODO */ /* recv addr */
+        unmarshalling.skip(26); /* TODO */ /* send addr */
+        nounce=unmarshalling.read_uint64();
+        version=unmarshalling.read_varstr();
+        best_height=unmarshalling.read_uint32();
+        unmarshalling.read_bool();
+
+        assert!(unmarshalling.is_end());
+
+        Version
+        {
+            version:     version,
+            time:        time,
+            best_height: best_height,
+            nounce:      nounce
+        }
     }
 
     // TODO: create a trait for serialization
@@ -107,13 +153,16 @@ impl Version
         let mut msg = ::marshalling::Marshalling::new();
         let header : Header;
 
+        /* TODO everything here should be in the struct.
+         * eg. self.services
+         */
         msg.write_uint32(::config::PROTOCOL_VERSION);
         msg.write_uint64(::config::SERVICES as u64);
         msg.write_timestamp(self.time);
         msg.write_netaddr(None,::config::SERVICES,None); /* recv addr */
         msg.write_netaddr(None,::config::SERVICES,None); /* send addr */
         msg.write_uint64(self.nounce);
-        msg.write_varstr(&self.name_version_bip0014());
+        msg.write_varstr(&self.version);
         msg.write_uint32(self.best_height);
         msg.write_bool(true); /* relay transactions */
 
@@ -123,5 +172,15 @@ impl Version
                              ::crypto::checksum(&msg.get()));
 
         header.serialize() + msg.get()
+    }
+}
+
+impl Show for Version
+{
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    {
+        try!(write!(f, "Version : {}\n", self.version));
+
+        Ok(())
     }
 }
