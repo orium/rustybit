@@ -197,7 +197,6 @@ impl Unmarshalling
         }
     }
 
-    /* TODO XXX remove when not needed */
     pub fn skip(&mut self, s : uint)
     {
         self.pos += s;

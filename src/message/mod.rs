@@ -5,11 +5,15 @@ use std::io::net::ip::SocketAddr;
 pub mod header;
 pub mod version;
 pub mod versionack;
+pub mod ping;
+pub mod pong;
 
 pub enum Message
 {
     MsgVersion(version::Version),
-    MsgVersionAck(versionack::VersionAck)
+    MsgVersionAck(versionack::VersionAck),
+    MsgPing(ping::Ping),
+    MsgPong(pong::Pong)
 }
 
 pub struct NetAddr
