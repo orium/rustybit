@@ -36,6 +36,9 @@ impl Show for VersionAck
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
-        write!(f, "VersionAck")
+        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let space = String::from_str(" ").repeat(width);
+
+        write!(f, "{}VersionAck", space)
     }
 }

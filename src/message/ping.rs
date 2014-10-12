@@ -56,6 +56,9 @@ impl Show for Ping
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
-        write!(f,"Ping {}", self.nounce)
+        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let space = String::from_str(" ").repeat(width);
+
+        write!(f,"{}Ping {}", space, self.nounce)
     }
 }

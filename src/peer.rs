@@ -64,7 +64,14 @@ impl Peer
         let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
         let version = Version::new(::config::name_version_bip0014(),0);
 
+        println!("<<< {}  {:30} command: {:9}",
+                 time::now().rfc822z(),
+                 self.addr,
+                 "version");
+
         try_or!(socket.write(version.serialize().as_slice()),ERR);
+
+        println!("{:4}",version);
 
         Ok(())
     }
@@ -74,7 +81,14 @@ impl Peer
         let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
         let verack = VersionAck::new();
 
+        println!("<<< {}  {:30} command: {:9}",
+                 time::now().rfc822z(),
+                 self.addr,
+                 "verack");
+
         try_or!(socket.write(verack.serialize().as_slice()),ERR);
+
+        println!("{:4}",verack);
 
         Ok(())
     }
@@ -83,6 +97,13 @@ impl Peer
     {
         let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
         let pong = Pong::new(nounce);
+
+        println!("<<< {}  {:30} command: {:9}",
+                 time::now().rfc822z(),
+                 self.addr,
+                 "pong");
+
+        println!("{:4}",pong);
 
         try_or!(socket.write(pong.serialize().as_slice()),ERR);
 
@@ -121,14 +142,10 @@ impl Peer
             return ERR_OK;
         }
 
-
-        println!("{}  {}  \tcommand: {:9} len: {}",
+        println!(">>> {}  {:30} \tcommand: {:9}",
                  time::now().rfc822z(),
                  self.addr,
-                 header.get_command(),
-                 header.get_payload_len());
-
-        println!("{}\n",header);
+                 header.get_command());
 
         match header.get_command().as_slice()
         {
@@ -196,7 +213,7 @@ impl Peer
             {
                 MsgVersion(version) =>
                 {
-                    println!("{}",version);
+                    println!("{:4}",version);
 
                     /* Do not allow a peer send a version msg twice */
                     if self.version.is_some()
@@ -215,21 +232,21 @@ impl Peer
                 },
                 MsgVersionAck(verack) =>
                 {
-                    println!("{}",verack);
+                    println!("{:4}",verack);
                 },
                 MsgPing(ping) =>
                 {
-                    println!("{}",ping);
+                    println!("{:4}",ping);
 
                     try_or!(self.send_pong(ping.get_nounce()),Err(()));
                 }
                 MsgPong(pong) =>
                 {
-                    println!("{}",pong);
+                    println!("{:4}",pong);
                 }
                 MsgAddresses(addrs) =>
                 {
-                    println!("{}",addrs);
+                    println!("{:4}",addrs);
                 }
             };
         };
@@ -238,7 +255,7 @@ impl Peer
     }
 }
 
-/* XXX Progress:
+/* Progress:
  *
  *          recv | send
  * ______________________

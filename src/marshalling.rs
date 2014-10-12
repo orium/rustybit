@@ -389,11 +389,14 @@ impl Unmarshalling
 
         services = self.read_uint64();
 
-        for _ in range(0u,10)
+        for i in range(0u,10)
         {
             if self.buf[self.pos] != 0x00u8
             {
                 println!("unimplemented: read_netaddr() IPv6"); /* TODO */
+
+                self.skip(10-i+6);
+
                 return ::message::NetAddr::new(time,services,None);
             }
 

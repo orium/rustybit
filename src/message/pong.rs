@@ -50,6 +50,9 @@ impl Show for Pong
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
-        write!(f,"Pong {}", self.nounce)
+        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let space = String::from_str(" ").repeat(width);
+
+        write!(f, "{}Pong {}", space, self.nounce)
     }
 }

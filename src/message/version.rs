@@ -85,7 +85,6 @@ impl Version
         services = unmarshalling.read_uint64();
         time = unmarshalling.read_timestamp64();
         addr_recv = unmarshalling.read_netaddr(false);
-        println!("first ok");
         addr_send = unmarshalling.read_netaddr(false);
         nounce = unmarshalling.read_uint64();
         version = unmarshalling.read_varstr();
@@ -115,12 +114,15 @@ impl Show for Version
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
-        try!(write!(f, "Proto ver  : {}\n", self.proto_ver));
-        try!(write!(f, "Version    : {}\n", self.version));
-        try!(write!(f, "Addr recv  : {}\n", self.addr_recv));
-        try!(write!(f, "Addr send  : {}\n", self.addr_send));
-        try!(write!(f, "Best height: {}\n", self.best_height));
-        try!(write!(f, "Relay      : {}", self.relay));
+        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let space = String::from_str(" ").repeat(width);
+
+        try!(write!(f, "{}Proto ver  : {}\n", space, self.proto_ver));
+        try!(write!(f, "{}Version    : {}\n", space, self.version));
+        try!(write!(f, "{}Addr recv  : {}\n", space, self.addr_recv));
+        try!(write!(f, "{}Addr send  : {}\n", space, self.addr_send));
+        try!(write!(f, "{}Best height: {}\n", space, self.best_height));
+        try!(write!(f, "{}Relay      : {}", space, self.relay));
 
         Ok(())
     }

@@ -79,13 +79,17 @@ impl Show for Addresses
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
-        try!(write!(f,"Addresses:\n"));
+        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let space = String::from_str(" ").repeat(width);
+
+        try!(write!(f,"{}Addresses:\n", space));
 
         for i in range(0,self.addresses.len())
         {
-            try!(write!(f,"    Address #{} {}",i+1,self.addresses[i]));
+            try!(write!(f,"{}    Address #{} {}{}",space,i+1,self.addresses[i],
+                 if i == self.addresses.len()-1 { "" } else { "\n" }));
         }
 
-        Ok(()) // XXX TODO
+        Ok(())
     }
 }
