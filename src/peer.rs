@@ -7,8 +7,10 @@ use std::time::duration::Duration;
 
 use message::Message;
 use message::MsgVersion;
+use message::MsgVersionAck;
 use message::Header;
 use message::Version;
+use message::VersionAck;
 
 macro_rules! try_or(
     ($e:expr, $err:expr) => (match $e { Ok(e) => e, Err(_) => return $err })
@@ -20,8 +22,9 @@ macro_rules! some_ref_or(
 
 pub struct Peer
 {
-    addr   : SocketAddr,
-    socket : Option<TcpStream>
+    addr    : SocketAddr,
+    socket  : Option<TcpStream>,
+    version : Option<Version>
 }
 
 /* TODO:
@@ -36,8 +39,9 @@ impl Peer
 {
     pub fn new(addr : SocketAddr) -> Peer
     {
-        Peer { addr:   addr,
-               socket: None }
+        Peer { addr:    addr,
+               socket:  None,
+               version: None }
     }
 
     pub fn connect(&mut self) -> Result<(),()>
@@ -56,6 +60,16 @@ impl Peer
         let version = Version::new(::config::name_version_bip0014(),0);
 
         try_or!(socket.write(version.serialize().as_slice()),ERR);
+
+        Ok(())
+    }
+
+    fn send_versionack(&mut self) -> Result<(),()>
+    {
+        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
+        let verack = VersionAck::new();
+
+        try_or!(socket.write(verack.serialize().as_slice()),ERR);
 
         Ok(())
     }
@@ -110,6 +124,14 @@ impl Peer
 
                 Ok(MsgVersion(version))
             },
+            "verack" =>
+            {
+                let verack : VersionAck;
+
+                verack = VersionAck::unserialize(&data_msg);
+
+                Ok(MsgVersionAck(verack))
+            },
             _ => ERR_OK
         }
     }
@@ -132,9 +154,17 @@ impl Peer
 
             match maybemsg.unwrap()
             {
-                MsgVersion(version) =>
+                MsgVersion(version)   =>
                 {
                     println!("{}",version);
+
+                    self.version = Some(version);
+
+                    try_or!(self.send_versionack(),Err(()));
+                },
+                MsgVersionAck(verack) =>
+                {
+                    println!("{}",verack);
                 }
             };
         };

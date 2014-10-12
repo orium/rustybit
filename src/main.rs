@@ -40,7 +40,8 @@ fn main()
 
 /* TODO:
  *
- * There are asserts that need to be verified in runtime and handled
- *       gracefully instead of terminating the program
- *       (eg. Unmarshalling::read_strvar()).
+ *  * There are asserts that need to be verified in runtime and handled
+ *    gracefully instead of terminating the program
+ *    (eg. Unmarshalling::read_strvar()).
+ *  * Refuse to talk with a client with proto_ver < 70002
  */

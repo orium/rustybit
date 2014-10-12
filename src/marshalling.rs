@@ -1,10 +1,10 @@
 extern crate time;
 
-use std::io::net::ip::SocketAddr;
 use std::io::net::ip::{Ipv4Addr, Ipv6Addr};
 
 static VARSTR_MAX_LENGTH : uint = 256;
-static VARSTR_SAFE_CHARS : &'static str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890 .,;_/:?@";
+static VARSTR_SAFE_CHARS : &'static str
+    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890 .,;_/:?@";
 
 pub struct Marshalling
 {
@@ -71,7 +71,7 @@ impl Marshalling
     {
         match v
         {
-            0u64           ... 252u64             => {
+            0u64           ... 252u64                => {
                 self.buf.push(v as u8);
             },
             253u64         ... 0xffffu64             => {
