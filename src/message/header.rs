@@ -40,6 +40,18 @@ impl Header
         self.len as uint
     }
 
+    pub fn serialize(&self) -> Vec<u8>
+    {
+        let mut header = ::marshalling::Marshalling::new();
+
+        header.write_uint32(self.network);
+        header.write_str12(&self.command);
+        header.write_uint32(self.len);
+        header.write_uint32(self.checksum);
+
+        header.get()
+    }
+
     pub fn unserialize(data : &Vec<u8>) -> Header
     {
         let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
@@ -58,18 +70,6 @@ impl Header
         assert!(unmarshalling.is_end());
 
         header
-    }
-
-    pub fn serialize(&self) -> Vec<u8>
-    {
-        let mut header = ::marshalling::Marshalling::new();
-
-        header.write_uint32(self.network);
-        header.write_str12(&self.command);
-        header.write_uint32(self.len);
-        header.write_uint32(self.checksum);
-
-        header.get()
     }
 }
 

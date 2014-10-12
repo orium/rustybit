@@ -1,6 +1,7 @@
 extern crate time;
 
-use std::io::net::ip::{Ipv4Addr, Ipv6Addr};
+use std::io::net::ip::SocketAddr;
+use std::io::net::ip::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 static VARSTR_MAX_LENGTH : uint = 256;
 static VARSTR_SAFE_CHARS : &'static str
@@ -119,16 +120,21 @@ impl Marshalling
         }
     }
 
-    pub fn write_timestamp(&mut self, time : time::Tm)
+    pub fn write_timestampu32(&mut self, time : time::Timespec)
     {
-        self.write_int64(time.to_timespec().sec);
+        self.write_uint32(time.sec as u32);
+    }
+
+    pub fn write_timestamp64(&mut self, time : time::Timespec)
+    {
+        self.write_int64(time.sec);
     }
 
     pub fn write_netaddr(&mut self, netaddr : &::message::NetAddr)
     {
         if netaddr.time.is_some()
         {
-            self.write_timestamp(netaddr.time.unwrap());
+            self.write_timestampu32(netaddr.time.unwrap());
         }
 
         self.write_uint64(netaddr.services as u64);
@@ -141,7 +147,7 @@ impl Marshalling
                 {
                     Ipv4Addr(b3, b2, b1, b0) =>
                     {
-                        self.write([0u8, ..10]);
+                        self.write([0x00u8, ..10]);
                         self.write([0xffu8, ..2]);
                         self.write([b3,b2,b1,b0]);
                     },
@@ -247,10 +253,21 @@ impl Unmarshalling
         v
     }
 
-    /* TODO
-    read_int64
-    read_int32
-     */
+    pub fn read_int32(&mut self) -> i32
+    {
+        assert!(self.pos+4 <= self.buf.len());
+
+        /* TODO: read negative values */
+        self.read_uint32() as i32
+    }
+
+    pub fn read_int64(&mut self) -> i64
+    {
+        assert!(self.pos+8 <= self.buf.len());
+
+        /* TODO: read negative values */
+        self.read_uint64() as i64
+    }
 
     pub fn read_bool(&mut self) -> bool
     {
@@ -344,10 +361,72 @@ impl Unmarshalling
         str
     }
 
-    /* TODO
-    read_timestamp
-    read_netaddr
-     */
+    pub fn read_timestampu32(&mut self) -> time::Timespec
+    {
+        assert!(self.pos+4 <= self.buf.len());
+
+        time::Timespec::new(self.read_uint32() as i64,0)
+    }
+
+    pub fn read_timestamp64(&mut self) -> time::Timespec
+    {
+        assert!(self.pos+8 <= self.buf.len());
+
+        time::Timespec::new(self.read_int64(),0)
+    }
+
+    pub fn read_netaddr(&mut self, with_time : bool) -> ::message::NetAddr
+    {
+        let time : Option<time::Timespec>;
+        let services : ::config::Services;
+        let addr : IpAddr;
+        let port : u16;
+        let mut socketaddr : Option<SocketAddr>;
+
+        assert!(self.pos+if with_time { 30 } else { 24 } <= self.buf.len());
+
+        time = if with_time { Some(self.read_timestampu32()) } else { None };
+
+        services = self.read_uint64();
+
+        for _ in range(0u,10)
+        {
+            if self.buf[self.pos] != 0x00u8
+            {
+                println!("unimplemented: read_netaddr() IPv6"); /* TODO */
+                return ::message::NetAddr::new(time,services,None);
+            }
+
+            self.pos += 1;
+        }
+
+        assert!(self.buf[self.pos] == 0xffu8 && self.buf[self.pos+1] == 0xffu8);
+
+        self.pos += 2; /* skip FF FF */
+
+        addr = Ipv4Addr(self.buf[self.pos],
+                        self.buf[self.pos+1],
+                        self.buf[self.pos+2],
+                        self.buf[self.pos+3]);
+
+        self.pos += 4;
+
+        port = self.read_uint16();
+
+        socketaddr = None;
+
+        if addr != Ipv4Addr(0,0,0,0)
+        {
+            socketaddr = Some(SocketAddr {
+                ip: addr,
+                port: port,
+            });
+
+            assert!(port > 0);
+        }
+
+        ::message::NetAddr::new(time,services,socketaddr)
+    }
 
     pub fn is_end(&self) -> bool
     {

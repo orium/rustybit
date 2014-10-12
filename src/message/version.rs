@@ -10,7 +10,7 @@ pub struct Version
     proto_ver   : u32,
     services    : ::config::Services,
     version     : String,
-    time        : time::Tm,
+    time        : time::Timespec,
     addr_recv   : ::message::NetAddr,
     addr_send   : ::message::NetAddr,
     best_height : u32,
@@ -30,7 +30,7 @@ impl Version
             proto_ver:   ::config::PROTOCOL_VERSION,
             services:    ::config::SERVICES,
             version:     version,
-            time:        time::now_utc(),
+            time:        time::now_utc().to_timespec(),
             addr_recv:   ::message::NetAddr::new(None,::config::SERVICES,None),
             addr_send:   ::message::NetAddr::new(None,::config::SERVICES,None),
             best_height: best_height,
@@ -39,13 +39,42 @@ impl Version
         }
     }
 
+    pub fn get_protocol_version(&self) -> u32
+    {
+        self.proto_ver
+    }
+
+    // TODO: create a trait for serialization
+    pub fn serialize(&self) -> Vec<u8>
+    {
+        let mut msg = ::marshalling::Marshalling::new();
+        let header : Header;
+
+        msg.write_uint32(self.proto_ver);
+        msg.write_uint64(self.services);
+        msg.write_timestamp64(self.time);
+        msg.write_netaddr(&self.addr_recv);
+        msg.write_netaddr(&self.addr_send);
+        msg.write_uint64(self.nounce);
+        msg.write_varstr(&self.version);
+        msg.write_uint32(self.best_height);
+        msg.write_bool(self.relay);
+
+        header = Header::new(::config::NETWORK,
+                             "version".to_string(),
+                             msg.len() as u32,
+                             ::crypto::checksum(&msg.get()));
+
+        header.serialize() + msg.get()
+    }
+
     pub fn unserialize(data : &Vec<u8>) -> Version
     {
         let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
         let proto_ver : u32;
         let services : ::config::Services;
         let version : String;
-        let time : time::Tm;
+        let time : time::Timespec;
         let addr_recv: ::message::NetAddr;
         let addr_send: ::message::NetAddr;
         let best_height : u32;
@@ -54,12 +83,10 @@ impl Version
 
         proto_ver = unmarshalling.read_uint32();
         services = unmarshalling.read_uint64();
-        time = time::empty_tm();
-        unmarshalling.skip(8);  /* TODO  timestamp */
-        addr_recv = ::message::NetAddr::new(None,::config::SERVICES,None);
-        unmarshalling.skip(26); /* TODO   recv addr */
-        addr_send = ::message::NetAddr::new(None,::config::SERVICES,None);
-        unmarshalling.skip(26); /* TODO   send addr */
+        time = unmarshalling.read_timestamp64();
+        addr_recv = unmarshalling.read_netaddr(false);
+        println!("first ok");
+        addr_send = unmarshalling.read_netaddr(false);
         nounce = unmarshalling.read_uint64();
         version = unmarshalling.read_varstr();
         best_height = unmarshalling.read_uint32();
@@ -82,40 +109,18 @@ impl Version
             relay:       relay
         }
     }
-
-    // TODO: create a trait for serialization
-    pub fn serialize(&self) -> Vec<u8>
-    {
-        let mut msg = ::marshalling::Marshalling::new();
-        let header : Header;
-
-        msg.write_uint32(self.proto_ver);
-        msg.write_uint64(self.services);
-        msg.write_timestamp(self.time);
-        msg.write_netaddr(&self.addr_recv);
-        msg.write_netaddr(&self.addr_send);
-        msg.write_uint64(self.nounce);
-        msg.write_varstr(&self.version);
-        msg.write_uint32(self.best_height);
-        msg.write_bool(self.relay);
-
-        header = Header::new(::config::NETWORK,
-                             "version".to_string(),
-                             msg.len() as u32,
-                             ::crypto::checksum(&msg.get()));
-
-        header.serialize() + msg.get()
-    }
 }
 
 impl Show for Version
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
-        try!(write!(f, "Proto ver   : {}\n", self.proto_ver));
-        try!(write!(f, "Version     : {}\n", self.version));
-        try!(write!(f, "Best height : {}\n", self.best_height));
-        try!(write!(f, "Relay       : {}", self.relay));
+        try!(write!(f, "Proto ver  : {}\n", self.proto_ver));
+        try!(write!(f, "Version    : {}\n", self.version));
+        try!(write!(f, "Addr recv  : {}\n", self.addr_recv));
+        try!(write!(f, "Addr send  : {}\n", self.addr_send));
+        try!(write!(f, "Best height: {}\n", self.best_height));
+        try!(write!(f, "Relay      : {}", self.relay));
 
         Ok(())
     }
