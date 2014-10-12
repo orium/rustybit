@@ -13,6 +13,9 @@ pub static NETWORK : u32 = MainNet as u32; /* This should be of type Network */
 
 pub static PROTOCOL_VERSION : u32 = 70002;
 
+/* We reject peers with protocol versions smaller than this */
+pub static PROTOCOL_VERSION_MIN : u32 = 70002;
+
 pub enum Service
 {
     None        = 0,

@@ -194,6 +194,11 @@ impl Peer
                         return Err(());
                     }
 
+                    if version.get_protocol_version() < ::config::PROTOCOL_VERSION_MIN
+                    {
+                        return Err(());
+                    }
+
                     self.version = Some(version);
 
                     try_or!(self.send_versionack(),Err(()));
@@ -229,4 +234,6 @@ impl Peer
  * pong       v  |   v
  * addr          |   
  * inv           |   
+ *
+ * TODO: we should ping
  */
