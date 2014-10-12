@@ -10,11 +10,13 @@ use message::MsgVersion;
 use message::MsgVersionAck;
 use message::MsgPing;
 use message::MsgPong;
+use message::MsgAddresses;
 use message::header::Header;
 use message::version::Version;
 use message::versionack::VersionAck;
 use message::ping::Ping;
 use message::pong::Pong;
+use message::addresses::Addresses;
 
 macro_rules! try_or(
     ($e:expr, $err:expr) => (match $e { Ok(e) => e, Err(_) => return $err })
@@ -162,6 +164,14 @@ impl Peer
 
                 Ok(MsgPong(pong))
             },
+            "addr" =>
+            {
+                let addr : Addresses;
+
+                addr = Addresses::unserialize(&data_msg);
+
+                Ok(MsgAddresses(addr))
+            },
             _ => ERR_OK
         }
     }
@@ -184,7 +194,7 @@ impl Peer
 
             match maybemsg.unwrap()
             {
-                MsgVersion(version)   =>
+                MsgVersion(version) =>
                 {
                     println!("{}",version);
 
@@ -211,11 +221,15 @@ impl Peer
                 {
                     println!("{}",ping);
 
-                    self.send_pong(ping.get_nounce());
+                    try_or!(self.send_pong(ping.get_nounce()),Err(()));
                 }
                 MsgPong(pong) =>
                 {
                     println!("{}",pong);
+                }
+                MsgAddresses(addrs) =>
+                {
+                    println!("{}",addrs);
                 }
             };
         };
@@ -232,7 +246,7 @@ impl Peer
  * verack     v  |   v
  * ping       v  |   
  * pong       v  |   v
- * addr          |   
+ * addr       v  |   
  * inv           |   
  *
  * TODO: we should ping

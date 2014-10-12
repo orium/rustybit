@@ -1,0 +1,91 @@
+use std::fmt::Show;
+use std::fmt::Formatter;
+
+use message::header::Header;
+use message::NetAddr;
+
+pub struct Addresses
+{
+    addresses : Vec<NetAddr>
+}
+
+#[allow(dead_code)]
+impl Addresses
+{
+    pub fn new() -> Addresses
+    {
+        Addresses
+        {
+            addresses: Vec::new()
+        }
+    }
+
+    pub fn add(&mut self, addr : NetAddr)
+    {
+        self.addresses.push(addr);
+
+        assert!(self.addresses.len() <= 1000);
+    }
+
+    pub fn get_addresses(&self) -> &Vec<NetAddr>
+    {
+        &self.addresses
+    }
+
+    pub fn serialize(&self) -> Vec<u8>
+    {
+        let mut msg = ::marshalling::Marshalling::new();
+        let header : Header;
+
+        msg.write_varint(self.addresses.len() as u64);
+
+        for i in range(0,self.addresses.len())
+        {
+            msg.write_netaddr(&self.addresses[i]);
+        }
+
+        header = Header::new(::config::NETWORK,
+                             "addr".to_string(),
+                             msg.len() as u32,
+                             ::crypto::checksum(&msg.get()));
+
+        header.serialize() + msg.get()
+    }
+
+    pub fn unserialize(data : &Vec<u8>) -> Addresses
+    {
+        let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
+        let mut addresses : Addresses = Addresses::new();
+        let count : u64;
+
+        count = unmarshalling.read_varint();
+
+        assert!(count <= 1000);
+
+        for _ in range(0,count)
+        {
+            let netaddr = unmarshalling.read_netaddr(true);
+
+            addresses.add(netaddr);
+        }
+
+        assert!(unmarshalling.is_end());
+
+        addresses
+    }
+}
+
+impl Show for Addresses
+{
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    {
+        try!(write!(f,"Addresses:\n"));
+
+        for i in range(0,self.addresses.len())
+        {
+            try!(write!(f,"    Address #{} {}",i+1,self.addresses[i]));
+        }
+
+        Ok(()) // XXX TODO
+    }
+}

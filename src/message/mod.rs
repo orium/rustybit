@@ -10,13 +10,15 @@ pub mod version;
 pub mod versionack;
 pub mod ping;
 pub mod pong;
+pub mod addresses;
 
 pub enum Message
 {
     MsgVersion(version::Version),
     MsgVersionAck(versionack::VersionAck),
     MsgPing(ping::Ping),
-    MsgPong(pong::Pong)
+    MsgPong(pong::Pong),
+    MsgAddresses(addresses::Addresses)
 }
 
 pub struct NetAddr
