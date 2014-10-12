@@ -8,9 +8,9 @@ use std::time::duration::Duration;
 use message::Message;
 use message::MsgVersion;
 use message::MsgVersionAck;
-use message::Header;
-use message::Version;
-use message::VersionAck;
+use message::header::Header;
+use message::version::Version;
+use message::versionack::VersionAck;
 
 macro_rules! try_or(
     ($e:expr, $err:expr) => (match $e { Ok(e) => e, Err(_) => return $err })
