@@ -154,7 +154,9 @@ impl Marshalling
                     Ipv6Addr(..) => unimplemented!() /* TODO ipv6 */
                 };
 
-                self.write_uint16(addr.port);
+                /* port is encoded in network order (big endian) */
+                self.write(&[(addr.port>>8) as u8,
+                             (addr.port&0xff) as u8]);
             }
             None =>
             {
@@ -437,7 +439,10 @@ impl Unmarshalling
 
         self.pos += 4;
 
-        port = self.read_uint16();
+        /* port is encoded in network order (big endian) */
+        port = ((self.buf[self.pos] as u16)<<8) | (self.buf[self.pos+1] as u16);
+
+        self.pos += 2;
 
         socketaddr = None;
 
