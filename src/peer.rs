@@ -11,12 +11,14 @@ use message::MsgVersionAck;
 use message::MsgPing;
 use message::MsgPong;
 use message::MsgAddresses;
+use message::MsgInv;
 use message::header::Header;
 use message::version::Version;
 use message::versionack::VersionAck;
 use message::ping::Ping;
 use message::pong::Pong;
 use message::addresses::Addresses;
+use message::inv::Inv;
 
 macro_rules! try_or(
     ($e:expr, $err:expr) => (match $e { Ok(e) => e, Err(_) => return $err })
@@ -189,6 +191,14 @@ impl Peer
 
                 Ok(MsgAddresses(addr))
             },
+            "inv" =>
+            {
+                let inv : Inv;
+
+                inv = Inv::unserialize(&data_msg);
+
+                Ok(MsgInv(inv))
+            },
             _ => ERR_OK
         }
     }
@@ -248,6 +258,10 @@ impl Peer
                 {
                     println!("{:4}",addrs);
                 }
+                MsgInv(inv) =>
+                {
+                    println!("{:4}",inv);
+                }
             };
         };
 
@@ -264,7 +278,7 @@ impl Peer
  * ping       v  |   
  * pong       v  |   v
  * addr       v  |   
- * inv           |   
+ * inv        v  |   
  *
  * TODO: we should ping
  */

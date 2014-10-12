@@ -39,9 +39,9 @@ impl Addresses
 
         msg.write_varint(self.addresses.len() as u64);
 
-        for i in range(0,self.addresses.len())
+        for addr in self.addresses.iter()
         {
-            msg.write_netaddr(&self.addresses[i]);
+            msg.write_netaddr(addr);
         }
 
         header = Header::new(::config::NETWORK,

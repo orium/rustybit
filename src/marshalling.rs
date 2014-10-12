@@ -97,9 +97,9 @@ impl Marshalling
 
         assert!(bytes.len() <= 12);
 
-        for i in range(0u,bytes.len())
+        for b in bytes.iter()
         {
-            self.buf.push(bytes[i]);
+            self.buf.push(*b);
         }
 
         for _ in range(str.len(),12)
@@ -114,9 +114,9 @@ impl Marshalling
 
         self.write_varint(bytes.len() as u64);
 
-        for i in range(0u,bytes.len())
+        for b in bytes.iter()
         {
-            self.buf.push(bytes[i]);
+            self.buf.push(*b);
         }
     }
 
@@ -164,6 +164,29 @@ impl Marshalling
                 self.write_uint16(0);   /* port */
             }
         };
+    }
+
+    pub fn write_hash(&mut self, hash : &Vec<u8>)
+    {
+        assert!(hash.len() == 32);
+
+        for i in range(0u,32).rev()
+        {
+            self.buf.push(hash[i]);
+        }
+    }
+
+    pub fn write_invvect(&mut self, invvec : &::message::InvVect)
+    {
+        self.write_varint(invvec.len() as u64);
+
+        for i in range(0,invvec.len())
+        {
+            let entry : &::message::InvEntry = invvec.get(i);
+
+            self.write_uint32(entry.typ as u32);
+            self.write_hash(&entry.hash);
+        }
     }
 
     pub fn get(&self) -> Vec<u8>
@@ -395,7 +418,7 @@ impl Unmarshalling
             {
                 println!("unimplemented: read_netaddr() IPv6"); /* TODO */
 
-                self.skip(10-i+6);
+                self.skip(10-i+8);
 
                 return ::message::NetAddr::new(time,services,None);
             }
@@ -429,6 +452,52 @@ impl Unmarshalling
         }
 
         ::message::NetAddr::new(time,services,socketaddr)
+    }
+
+    pub fn read_hash(&mut self) -> Vec<u8>
+    {
+        let mut hash : Vec<u8> = Vec::new();
+
+        assert!(self.pos+32 <= self.buf.len());
+
+        for _ in range(0u,32)
+        {
+            hash.push(self.buf[self.pos]);
+            self.pos += 1;
+        }
+
+        hash.reverse();
+
+        hash
+    }
+
+    pub fn read_invvect(&mut self) -> ::message::InvVect
+    {
+        let mut invvec = ::message::InvVect::new();
+        let count : u64;
+
+        count = self.read_varint();
+
+        assert!(count <= 50000);
+
+        for _ in range(0,count)
+        {
+            let typ : ::message::InvEntryType;
+
+            typ = match self.read_uint32() {
+                0 => ::message::Error,
+                1 => ::message::MsgTx,
+                2 => ::message::MsgBlock,
+                _ => fail!("invalid type of inventory entry")
+            };
+
+            invvec.add(::message::InvEntry {
+                typ  : typ,
+                hash : self.read_hash()
+            });
+        }
+
+        invvec
     }
 
     pub fn is_end(&self) -> bool

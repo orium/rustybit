@@ -32,9 +32,9 @@ fn main()
                   SocketAddr { ip: Ipv4Addr(93,93,135,12), port: 8333 }
                  ];
 
-    for i in range(0,peers.len())
+    for peer in peers.iter()
     {
-        spawn_thread_handle_peer(peers[i]);
+        spawn_thread_handle_peer(*peer);
     }
 }
 

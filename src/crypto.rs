@@ -25,3 +25,17 @@ pub fn checksum(data : &Vec<u8>) -> u32
 
     unmarshalling.read_uint32()
 }
+
+pub fn hash_to_hexstr(hash : &Vec<u8>) -> String
+{
+    let mut str : String = String::new();
+
+    assert!(hash.len() == 32);
+
+    for b in hash.iter()
+    {
+        str.push_str(format!("{:02x}",*b).as_slice());
+    }
+
+    str
+}
