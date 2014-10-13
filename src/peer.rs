@@ -146,8 +146,7 @@ impl Peer
         let data_msg : Vec<u8>;
         let header : Header;
 
-        /* TODO 24 should be in Header::HEADER_SIZE */
-        data_hd = try_or!(socket.read_exact(24),ERR_FATAL);
+        data_hd = try_or!(socket.read_exact(::message::header::HEADER_SIZE),ERR_FATAL);
         header = Header::unserialize(&data_hd);
 
         if header.get_payload_len() >= PAYLOAD_MAX_SIZE

@@ -1,6 +1,9 @@
 use std::fmt::Show;
 use std::fmt::Formatter;
 
+/* TODO inside Header */
+pub static HEADER_SIZE : uint = 24;
+
 pub struct Header
 {
     network  : u32,
