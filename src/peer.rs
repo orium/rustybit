@@ -24,7 +24,7 @@ use message::addresses::Addresses;
 use message::inv::Inv;
 use message::getdata::GetData;
 
-use message::inv::InvVect;
+use datatype::invvect::InvVect;
 
 macro_rules! try_or(
     ($e:expr, $err:expr) => (match $e { Ok(e) => e, Err(_) => return $err })

@@ -3,8 +3,8 @@ extern crate time;
 use std::io::net::ip::SocketAddr;
 use std::io::net::ip::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use message::addresses::NetAddr;
-use message::inv::InvVect;
+use datatype::netaddr::NetAddr;
+use datatype::invvect::InvVect;
 
 static VARSTR_MAX_LENGTH : uint = 256;
 static VARSTR_SAFE_CHARS : &'static str
@@ -187,7 +187,7 @@ impl Marshalling
 
         for i in range(0,invvec.len())
         {
-            let entry : &::message::inv::InvEntry = invvec.get(i);
+            let entry : &::datatype::invvect::InvEntry = invvec.get(i);
 
             self.write_uint32(entry.typ as u32);
             self.write_hash(&entry.hash);
@@ -490,16 +490,16 @@ impl Unmarshalling
 
         for _ in range(0,count)
         {
-            let typ : ::message::inv::InvEntryType;
+            let typ : ::datatype::invvect::InvEntryType;
 
             typ = match self.read_uint32() {
-                0 => ::message::inv::Error,
-                1 => ::message::inv::MsgTx,
-                2 => ::message::inv::MsgBlock,
+                0 => ::datatype::invvect::Error,
+                1 => ::datatype::invvect::MsgTx,
+                2 => ::datatype::invvect::MsgBlock,
                 _ => fail!("invalid type of inventory entry")
             };
 
-            invvec.add(::message::inv::InvEntry {
+            invvec.add(::datatype::invvect::InvEntry {
                 typ  : typ,
                 hash : self.read_hash()
             });

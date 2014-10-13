@@ -4,6 +4,7 @@ use std::io::net::ip::SocketAddr;
 use std::io::net::ip::Ipv4Addr;
 
 mod config;
+mod datatype;
 mod marshalling;
 mod crypto;
 mod message;

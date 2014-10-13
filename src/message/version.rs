@@ -4,7 +4,7 @@ use std::fmt::Show;
 use std::fmt::Formatter;
 
 use message::header::Header;
-use message::addresses::NetAddr;
+use datatype::netaddr::NetAddr;
 
 pub struct Version
 {
