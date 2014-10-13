@@ -3,6 +3,9 @@ extern crate time;
 use std::io::net::ip::SocketAddr;
 use std::io::net::ip::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use message::addresses::NetAddr;
+use message::inv::InvVect;
+
 static VARSTR_MAX_LENGTH : uint = 256;
 static VARSTR_SAFE_CHARS : &'static str
     = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890 .,;_/:?@";
@@ -130,7 +133,7 @@ impl Marshalling
         self.write_int64(time.sec);
     }
 
-    pub fn write_netaddr(&mut self, netaddr : &::message::NetAddr)
+    pub fn write_netaddr(&mut self, netaddr : &NetAddr)
     {
         if netaddr.time.is_some()
         {
@@ -178,13 +181,13 @@ impl Marshalling
         }
     }
 
-    pub fn write_invvect(&mut self, invvec : &::message::InvVect)
+    pub fn write_invvect(&mut self, invvec : &InvVect)
     {
         self.write_varint(invvec.len() as u64);
 
         for i in range(0,invvec.len())
         {
-            let entry : &::message::InvEntry = invvec.get(i);
+            let entry : &::message::inv::InvEntry = invvec.get(i);
 
             self.write_uint32(entry.typ as u32);
             self.write_hash(&entry.hash);
@@ -400,7 +403,7 @@ impl Unmarshalling
         time::Timespec::new(self.read_int64(),0)
     }
 
-    pub fn read_netaddr(&mut self, with_time : bool) -> ::message::NetAddr
+    pub fn read_netaddr(&mut self, with_time : bool) -> NetAddr
     {
         let time : Option<time::Timespec>;
         let services : ::config::Services;
@@ -422,7 +425,7 @@ impl Unmarshalling
 
                 self.skip(10-i+8);
 
-                return ::message::NetAddr::new(time,services,None);
+                return NetAddr::new(time,services,None);
             }
 
             self.pos += 1;
@@ -449,14 +452,14 @@ impl Unmarshalling
         if addr != Ipv4Addr(0,0,0,0)
         {
             socketaddr = Some(SocketAddr {
-                ip: addr,
+                ip:   addr,
                 port: port,
             });
 
             assert!(port > 0);
         }
 
-        ::message::NetAddr::new(time,services,socketaddr)
+        NetAddr::new(time,services,socketaddr)
     }
 
     pub fn read_hash(&mut self) -> Vec<u8>
@@ -476,9 +479,9 @@ impl Unmarshalling
         hash
     }
 
-    pub fn read_invvect(&mut self) -> ::message::InvVect
+    pub fn read_invvect(&mut self) -> InvVect
     {
-        let mut invvec = ::message::InvVect::new();
+        let mut invvec = InvVect::new();
         let count : u64;
 
         count = self.read_varint();
@@ -487,16 +490,16 @@ impl Unmarshalling
 
         for _ in range(0,count)
         {
-            let typ : ::message::InvEntryType;
+            let typ : ::message::inv::InvEntryType;
 
             typ = match self.read_uint32() {
-                0 => ::message::Error,
-                1 => ::message::MsgTx,
-                2 => ::message::MsgBlock,
+                0 => ::message::inv::Error,
+                1 => ::message::inv::MsgTx,
+                2 => ::message::inv::MsgBlock,
                 _ => fail!("invalid type of inventory entry")
             };
 
-            invvec.add(::message::InvEntry {
+            invvec.add(::message::inv::InvEntry {
                 typ  : typ,
                 hash : self.read_hash()
             });

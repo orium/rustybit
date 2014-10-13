@@ -4,6 +4,7 @@ use std::fmt::Show;
 use std::fmt::Formatter;
 
 use message::header::Header;
+use message::addresses::NetAddr;
 
 pub struct Version
 {
@@ -11,8 +12,8 @@ pub struct Version
     services    : ::config::Services,
     version     : String,
     time        : time::Timespec,
-    addr_recv   : ::message::NetAddr,
-    addr_send   : ::message::NetAddr,
+    addr_recv   : NetAddr,
+    addr_send   : NetAddr,
     best_height : u32,
     nounce      : u64,
     relay       : bool /* see BIP0037 */
@@ -31,8 +32,8 @@ impl Version
             services:    ::config::SERVICES,
             version:     version,
             time:        time::now_utc().to_timespec(),
-            addr_recv:   ::message::NetAddr::new(None,::config::SERVICES,None),
-            addr_send:   ::message::NetAddr::new(None,::config::SERVICES,None),
+            addr_recv:   NetAddr::new(None,::config::SERVICES,None),
+            addr_send:   NetAddr::new(None,::config::SERVICES,None),
             best_height: best_height,
             nounce:      0xababeface, // TODO rng.gen()
             relay:       true
@@ -75,8 +76,8 @@ impl Version
         let services : ::config::Services;
         let version : String;
         let time : time::Timespec;
-        let addr_recv: ::message::NetAddr;
-        let addr_send: ::message::NetAddr;
+        let addr_recv: NetAddr;
+        let addr_send: NetAddr;
         let best_height : u32;
         let nounce : u64;
         let relay : bool;
