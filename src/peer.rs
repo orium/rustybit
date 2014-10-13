@@ -34,6 +34,11 @@ macro_rules! some_ref_or(
     ($e:expr, $err:expr) => (match $e { Some(ref mut e) => e, None => return $err })
 )
 
+macro_rules! OK(() => (Ok(())))
+macro_rules! ERR(() => (Err(())))
+macro_rules! ERR_OK(() => (Err(false)))
+macro_rules! ERR_FATAL(() => (Err(true)))
+
 pub struct Peer
 {
     addr    : SocketAddr,
@@ -45,8 +50,8 @@ pub struct Peer
  */
 
 /* TODO inside Peer */
-static ERR : Result<(),()> = Err(());
 static PAYLOAD_MAX_SIZE : uint = 4*(1<<20); /* 4MB */
+static CONNECT_TIMEOUT_MS : uint = 5000;
 
 impl Peer
 {
@@ -59,17 +64,17 @@ impl Peer
 
     pub fn connect(&mut self) -> Result<(),()>
     {
-        let CONNECT_TIMEOUT : Duration = Duration::milliseconds(5000);
-        let maybesocket = TcpStream::connect_timeout(self.addr,CONNECT_TIMEOUT);
+        let timeout : Duration = Duration::milliseconds(CONNECT_TIMEOUT_MS as i64);
+        let maybesocket = TcpStream::connect_timeout(self.addr,timeout);
 
-        self.socket = Some(try_or!(maybesocket,ERR));
+        self.socket = Some(try_or!(maybesocket,ERR!()));
 
         Ok(())
     }
 
     pub fn send_version(&mut self) -> Result<(),()>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
+        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR!());
         let version = Version::new(::config::name_version_bip0014(),0);
 
         println!("<<< {}  {:30} command: {:9}",
@@ -77,7 +82,7 @@ impl Peer
                  self.addr,
                  "version");
 
-        try_or!(socket.write(version.serialize().as_slice()),ERR);
+        try_or!(socket.write(version.serialize().as_slice()),ERR!());
 
         println!("{:4}",version);
 
@@ -86,7 +91,7 @@ impl Peer
 
     fn send_versionack(&mut self) -> Result<(),()>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
+        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR!());
         let verack = VersionAck::new();
 
         println!("<<< {}  {:30} command: {:9}",
@@ -94,7 +99,7 @@ impl Peer
                  self.addr,
                  "verack");
 
-        try_or!(socket.write(verack.serialize().as_slice()),ERR);
+        try_or!(socket.write(verack.serialize().as_slice()),ERR!());
 
         println!("{:4}",verack);
 
@@ -103,7 +108,7 @@ impl Peer
 
     fn send_pong(&mut self, nounce : u64) -> Result<(),()>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
+        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR!());
         let pong = Pong::new(nounce);
 
         println!("<<< {}  {:30} command: {:9}",
@@ -113,14 +118,14 @@ impl Peer
 
         println!("{:4}",pong);
 
-        try_or!(socket.write(pong.serialize().as_slice()),ERR);
+        try_or!(socket.write(pong.serialize().as_slice()),ERR!());
 
         Ok(())
     }
 
     fn send_getdata(&mut self, inv : &InvVect) -> Result<(),()>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
+        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR!());
         let getdata = GetData::from_inv(inv);
 
         println!("<<< {}  {:30} command: {:9}",
@@ -130,7 +135,7 @@ impl Peer
 
         println!("{:4}",getdata);
 
-        try_or!(socket.write(getdata.serialize().as_slice()),ERR);
+        try_or!(socket.write(getdata.serialize().as_slice()),ERR!());
 
         Ok(())
     }
@@ -139,23 +144,23 @@ impl Peer
      */
     pub fn read_message(&mut self) -> Result<Message,bool>
     {
-        let ERR_FATAL = Err(true);
-        let ERR_OK    = Err(false);
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR_FATAL);
+        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR_FATAL!());
         let data_hd : Vec<u8>;
         let data_msg : Vec<u8>;
         let header : Header;
 
-        data_hd = try_or!(socket.read_exact(::message::header::HEADER_SIZE),ERR_FATAL);
+        data_hd = try_or!(socket.read_exact(::message::header::HEADER_SIZE),
+                          ERR_FATAL!());
         header = Header::unserialize(&data_hd);
 
         if header.get_payload_len() >= PAYLOAD_MAX_SIZE
         {
             println!("message payload length too big");
-            return ERR_OK;
+            return ERR_OK!();
         }
 
-        data_msg = try_or!(socket.read_exact(header.get_payload_len()),ERR_FATAL);
+        data_msg = try_or!(socket.read_exact(header.get_payload_len()),
+                           ERR_FATAL!());
 
         /* TODO check network
          */
@@ -163,7 +168,7 @@ impl Peer
         if ::crypto::checksum(&data_msg) != header.get_checksum()
         {
             println!("invalid checksum");
-            return ERR_OK;
+            return ERR_OK!();
         }
 
         println!(">>> {}  {:30} \tcommand: {:9}",
@@ -229,7 +234,7 @@ impl Peer
 
                 Ok(MsgGetData(getdata))
             },
-            _ => ERR_OK
+            _ => ERR_OK!()
         }
     }
 
@@ -299,9 +304,7 @@ impl Peer
                     println!("{:4}",getdata);
                 }
             };
-        };
-
-        Ok(())
+        }
     }
 }
 
