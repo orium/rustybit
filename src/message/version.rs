@@ -94,7 +94,6 @@ impl Version
 
         assert!(services == ::config::None as u64
                 || services == ::config::NodeNetwork as u64);
-        assert!(unmarshalling.is_end());
 
         Version
         {

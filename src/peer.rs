@@ -15,6 +15,7 @@ use message::MsgInv;
 use message::MsgGetData;
 
 use message::header::Header;
+use message::header::HEADER_SIZE;
 
 use message::version::Version;
 use message::versionack::VersionAck;
@@ -34,10 +35,22 @@ macro_rules! some_ref_or(
     ($e:expr, $err:expr) => (match $e { Some(ref mut e) => e, None => return $err })
 )
 
-macro_rules! OK(() => (Ok(())))
-macro_rules! ERR(() => (Err(())))
-macro_rules! ERR_OK(() => (Err(false)))
-macro_rules! ERR_FATAL(() => (Err(true)))
+#[deriving(Show)]
+pub enum PeerError
+{
+    ReadEOF,
+    ReadTimeout,
+    ReadIncomplete,
+    ReadIOError,
+    ReadMsgPayloadTooBig,
+    ReadMsgInvalidChecksum,
+    ReadMsgUnknownMsg,
+    WriteIOError,
+    ConnectIOError,
+    NotConnected,
+    DoubleHandshake,
+    UnsupportedProtoVersion,
+}
 
 pub struct Peer
 {
@@ -46,10 +59,6 @@ pub struct Peer
     version : Option<Version>
 }
 
-/* TODO: define a error enum to use in result
- */
-
-/* TODO inside Peer */
 static PAYLOAD_MAX_SIZE : uint = 4*(1<<20); /* 4MB */
 static CONNECT_TIMEOUT_MS : uint = 5000;
 
@@ -62,19 +71,19 @@ impl Peer
                version: None }
     }
 
-    pub fn connect(&mut self) -> Result<(),()>
+    pub fn connect(&mut self) -> Result<(),PeerError>
     {
         let timeout : Duration = Duration::milliseconds(CONNECT_TIMEOUT_MS as i64);
         let maybesocket = TcpStream::connect_timeout(self.addr,timeout);
 
-        self.socket = Some(try_or!(maybesocket,ERR!()));
+        self.socket = Some(try_or!(maybesocket,Err(ConnectIOError)));
 
         Ok(())
     }
 
-    pub fn send_version(&mut self) -> Result<(),()>
+    pub fn send_version(&mut self) -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR!());
+        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
         let version = Version::new(::config::name_version_bip0014(),0);
 
         println!("<<< {}  {:30} command: {:9}",
@@ -82,16 +91,16 @@ impl Peer
                  self.addr,
                  "version");
 
-        try_or!(socket.write(version.serialize().as_slice()),ERR!());
+        try_or!(socket.write(version.serialize().as_slice()),Err(WriteIOError));
 
         println!("{:4}",version);
 
         Ok(())
     }
 
-    fn send_versionack(&mut self) -> Result<(),()>
+    fn send_versionack(&mut self) -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR!());
+        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
         let verack = VersionAck::new();
 
         println!("<<< {}  {:30} command: {:9}",
@@ -99,16 +108,16 @@ impl Peer
                  self.addr,
                  "verack");
 
-        try_or!(socket.write(verack.serialize().as_slice()),ERR!());
+        try_or!(socket.write(verack.serialize().as_slice()),Err(WriteIOError));
 
         println!("{:4}",verack);
 
         Ok(())
     }
 
-    fn send_pong(&mut self, nounce : u64) -> Result<(),()>
+    fn send_pong(&mut self, nounce : u64) -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR!());
+        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
         let pong = Pong::new(nounce);
 
         println!("<<< {}  {:30} command: {:9}",
@@ -116,16 +125,16 @@ impl Peer
                  self.addr,
                  "pong");
 
-        println!("{:4}",pong);
+        try_or!(socket.write(pong.serialize().as_slice()),Err(WriteIOError));
 
-        try_or!(socket.write(pong.serialize().as_slice()),ERR!());
+        println!("{:4}",pong);
 
         Ok(())
     }
 
-    fn send_getdata(&mut self, inv : &InvVect) -> Result<(),()>
+    fn send_getdata(&mut self, inv : &InvVect)  -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR!());
+        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
         let getdata = GetData::from_inv(inv);
 
         println!("<<< {}  {:30} command: {:9}",
@@ -133,127 +142,35 @@ impl Peer
                  self.addr,
                  "getdata");
 
-        println!("{:4}",getdata);
+        try_or!(socket.write(getdata.serialize().as_slice()),Err(WriteIOError));
 
-        try_or!(socket.write(getdata.serialize().as_slice()),ERR!());
+        println!("{:4}",getdata);
 
         Ok(())
     }
 
-    /* Returns Err(true) if fatal error
-     */
-    pub fn read_message(&mut self) -> Result<Message,bool>
+    pub fn read_loop(&mut self) -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR_FATAL!());
-        let data_hd : Vec<u8>;
-        let data_msg : Vec<u8>;
-        let header : Header;
+        let mut buffer : MsgBuffer = MsgBuffer::new();
 
-        data_hd = try_or!(socket.read_exact(::message::header::HEADER_SIZE),
-                          ERR_FATAL!());
-        header = Header::unserialize(&data_hd);
-
-        if header.get_payload_len() >= PAYLOAD_MAX_SIZE
-        {
-            println!("message payload length too big");
-            return ERR_OK!();
-        }
-
-        data_msg = try_or!(socket.read_exact(header.get_payload_len()),
-                           ERR_FATAL!());
-
-        /* TODO check network
-         */
-
-        if ::crypto::checksum(&data_msg) != header.get_checksum()
-        {
-            println!("invalid checksum");
-            return ERR_OK!();
-        }
-
-        println!(">>> {}  {:30} \tcommand: {:9}",
-                 time::now().rfc822z(),
-                 self.addr,
-                 header.get_command());
-
-        match header.get_command().as_slice()
-        {
-            "version" =>
-            {
-                let version : Version;
-
-                version = Version::unserialize(&data_msg);
-
-                Ok(MsgVersion(version))
-            },
-            "verack" =>
-            {
-                let verack : VersionAck;
-
-                verack = VersionAck::unserialize(&data_msg);
-
-                Ok(MsgVersionAck(verack))
-            },
-            "ping" =>
-            {
-                let ping : Ping;
-
-                ping = Ping::unserialize(&data_msg);
-
-                Ok(MsgPing(ping))
-            },
-            "pong" =>
-            {
-                let pong : Pong;
-
-                pong = Pong::unserialize(&data_msg);
-
-                Ok(MsgPong(pong))
-            },
-            "addr" =>
-            {
-                let addr : Addresses;
-
-                addr = Addresses::unserialize(&data_msg);
-
-                Ok(MsgAddresses(addr))
-            },
-            "inv" =>
-            {
-                let inv : Inv;
-
-                inv = Inv::unserialize(&data_msg);
-
-                Ok(MsgInv(inv))
-            },
-            "getdata" =>
-            {
-                let getdata : GetData;
-
-                getdata = GetData::unserialize(&data_msg);
-
-                Ok(MsgGetData(getdata))
-            },
-            _ => ERR_OK!()
-        }
-    }
-
-    pub fn read_loop(&mut self) -> Result<(),()>
-    {
         loop
         {
-            let maybemsg = self.read_message();
+            let maybemsg = buffer.read_message(some_ref_or!(self.socket,Err(NotConnected)));
 
             if maybemsg.is_err()
             {
-                match maybemsg
+                let err : PeerError = maybemsg.err().unwrap();
+
+                match err
                 {
-                    Err(true) => return Err(()),
-                    Err(false) => continue,
-                    _ => unreachable!()
+                    ReadEOF              => return Err(err),
+                    ReadIOError          => return Err(err),
+                    ReadMsgPayloadTooBig => return Err(err),
+                    _                    => continue
                 }
             }
 
+            // TODO: a function for each of these messages
             match maybemsg.unwrap()
             {
                 MsgVersion(version) =>
@@ -263,17 +180,17 @@ impl Peer
                     /* Do not allow a peer send a version msg twice */
                     if self.version.is_some()
                     {
-                        return Err(());
+                        return Err(DoubleHandshake);
                     }
 
                     if version.get_protocol_version() < ::config::PROTOCOL_VERSION_MIN
                     {
-                        return Err(());
+                        return Err(UnsupportedProtoVersion);
                     }
 
                     self.version = Some(version);
 
-                    try_or!(self.send_versionack(),Err(()));
+                    try!(self.send_versionack());
                 },
                 MsgVersionAck(verack) =>
                 {
@@ -283,7 +200,7 @@ impl Peer
                 {
                     println!("{:4}",ping);
 
-                    try_or!(self.send_pong(ping.get_nounce()),Err(()));
+                    try!(self.send_pong(ping.get_nounce()));
                 }
                 MsgPong(pong) =>
                 {
@@ -297,7 +214,7 @@ impl Peer
                 {
                     println!("{:4}",inv);
 
-                    try_or!(self.send_getdata(inv.get_invvect()),Err(()));
+                    try!(self.send_getdata(inv.get_invvect()));
                 }
                 MsgGetData(getdata) =>
                 {
@@ -305,6 +222,191 @@ impl Peer
                 }
             };
         }
+    }
+}
+
+static READ_TIMEOUT_MS : uint = 500;
+
+struct MsgBuffer
+{
+    buf : Vec<u8>
+}
+
+impl MsgBuffer
+{
+    pub fn new() -> MsgBuffer
+    {
+        MsgBuffer
+        {
+            buf: Vec::with_capacity(PAYLOAD_MAX_SIZE+HEADER_SIZE)
+        }
+    }
+
+    fn drop(&mut self, n : uint)
+    {
+        let len = self.buf.len();
+
+        assert!(self.buf.len() >= n);
+
+        for src in range(n,len)
+        {
+            let dst = src-n;
+
+            *self.buf.get_mut(dst) = self.buf[src];
+        }
+
+        self.buf.truncate(len-n);
+    }
+
+    fn read_ensure_size(&mut self, size : uint, socket : &mut TcpStream)
+                        -> Result<(),PeerError>
+    {
+        if self.buf.len() < size
+        {
+            let result;
+
+            socket.set_read_timeout(Some(READ_TIMEOUT_MS as u64));
+            result = socket.push(size-self.buf.len(),&mut self.buf);
+
+            if result.is_err()
+            {
+                match result.err().unwrap().kind
+                {
+                    ::std::io::EndOfFile => return Err(ReadEOF),
+                    ::std::io::TimedOut  => return Err(ReadTimeout),
+                    _                    => return Err(ReadIOError)
+                }
+            }
+
+            assert!(self.buf.len() <= size);
+
+            /* We fail to read the entire thing */
+            if self.buf.len() < size
+            {
+                return Err(ReadIncomplete);
+            }
+
+            assert!(self.buf.len() == size);
+        }
+
+        assert!(self.buf.len() >= size);
+
+        Ok(())
+    }
+
+    pub fn read_message(&mut self, socket : &mut TcpStream)
+                        -> Result<Message,PeerError>
+    {
+        let header : Header;
+        let msg : Result<Message,PeerError>;
+
+        /* We should never have to expand */
+        assert!(self.buf.capacity() == PAYLOAD_MAX_SIZE+HEADER_SIZE);
+
+        /* Read enoght to have a header */
+        try!(self.read_ensure_size(HEADER_SIZE,socket));
+
+        assert!(self.buf.len() >= HEADER_SIZE);
+
+        header = Header::unserialize(&self.buf);
+
+        if header.get_payload_len() > PAYLOAD_MAX_SIZE
+        {
+            println!("message payload length too big");
+
+            return Err(ReadMsgPayloadTooBig);
+        }
+
+        /* Read enoght to have the message payload */
+        try!(self.read_ensure_size(HEADER_SIZE+header.get_payload_len(),socket));
+
+        assert!(self.buf.len() == HEADER_SIZE+header.get_payload_len());
+
+        /* We can now safely drop the header, since we have a complete message */
+        self.drop(HEADER_SIZE);
+
+        assert!(self.buf.len() == header.get_payload_len());
+
+        if ::crypto::checksum(&self.buf) != header.get_checksum()
+        {
+            println!("invalid checksum");
+
+            self.buf.clear();
+
+            return Err(ReadMsgInvalidChecksum);
+        }
+
+        println!(">>> {}  {:30} \tcommand: {:9}",
+                 time::now().rfc822z(),
+                 socket.peer_name().unwrap(),
+                 header.get_command());
+
+        msg = match header.get_command().as_slice()
+        {
+            "version" =>
+            {
+                let version : Version;
+
+                version = Version::unserialize(&self.buf);
+
+                Ok(MsgVersion(version))
+            },
+            "verack" =>
+            {
+                let verack : VersionAck;
+
+                verack = VersionAck::unserialize(&self.buf);
+
+                Ok(MsgVersionAck(verack))
+            },
+            "ping" =>
+            {
+                let ping : Ping;
+
+                ping = Ping::unserialize(&self.buf);
+
+                Ok(MsgPing(ping))
+            },
+            "pong" =>
+            {
+                let pong : Pong;
+
+                pong = Pong::unserialize(&self.buf);
+
+                Ok(MsgPong(pong))
+            },
+            "addr" =>
+            {
+                let addr : Addresses;
+
+                addr = Addresses::unserialize(&self.buf);
+
+                Ok(MsgAddresses(addr))
+            },
+            "inv" =>
+            {
+                let inv : Inv;
+
+                inv = Inv::unserialize(&self.buf);
+
+                Ok(MsgInv(inv))
+            },
+            "getdata" =>
+            {
+                let getdata : GetData;
+
+                getdata = GetData::unserialize(&self.buf);
+
+                Ok(MsgGetData(getdata))
+            },
+            _ => Err(ReadMsgUnknownMsg)
+        };
+
+        self.buf.clear();
+
+        /* TODO check network */
+
+        msg
     }
 }
 

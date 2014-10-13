@@ -46,8 +46,6 @@ impl Ping
 
         nounce = unmarshalling.read_uint64();
 
-        assert!(unmarshalling.is_end());
-
         Ping { nounce: nounce }
     }
 }

@@ -507,9 +507,4 @@ impl Unmarshalling
 
         invvec
     }
-
-    pub fn is_end(&self) -> bool
-    {
-        self.pos == self.buf.len()
-    }
 }

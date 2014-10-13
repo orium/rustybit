@@ -33,7 +33,7 @@ impl Header
         self.checksum
     }
 
-    pub fn get_command<'a>(&'a self) -> &'a String
+    pub fn get_command(&self) -> &String
     {
         &self.command
     }
@@ -60,7 +60,7 @@ impl Header
         let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
         let header : Header;
 
-        assert!(data.len() == 24);
+        assert!(data.len() >= 24);
 
         header = Header
         {
@@ -69,8 +69,6 @@ impl Header
             len:      unmarshalling.read_uint32(),
             checksum: unmarshalling.read_uint32()
         };
-
-        assert!(unmarshalling.is_end());
 
         header
     }

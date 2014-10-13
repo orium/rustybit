@@ -40,8 +40,6 @@ impl Pong
 
         nounce = unmarshalling.read_uint64();
 
-        assert!(unmarshalling.is_end());
-
         Pong { nounce: nounce }
     }
 }

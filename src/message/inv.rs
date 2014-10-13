@@ -56,8 +56,6 @@ impl Inv
 
         vect = unmarshalling.read_invvect();
 
-        assert!(unmarshalling.is_end());
-
         Inv
         {
             vect: vect

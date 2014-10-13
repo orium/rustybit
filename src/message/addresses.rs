@@ -70,8 +70,6 @@ impl Addresses
             addresses.add(netaddr);
         }
 
-        assert!(unmarshalling.is_end());
-
         addresses
     }
 }

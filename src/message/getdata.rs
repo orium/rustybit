@@ -59,8 +59,6 @@ impl GetData
 
         vect = unmarshalling.read_invvect();
 
-        assert!(unmarshalling.is_end());
-
         GetData
         {
             vect: vect
