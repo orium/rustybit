@@ -12,13 +12,19 @@ use message::MsgPing;
 use message::MsgPong;
 use message::MsgAddresses;
 use message::MsgInv;
+use message::MsgGetData;
+
 use message::header::Header;
+
 use message::version::Version;
 use message::versionack::VersionAck;
 use message::ping::Ping;
 use message::pong::Pong;
 use message::addresses::Addresses;
 use message::inv::Inv;
+use message::getdata::GetData;
+
+use message::inv::InvVect;
 
 macro_rules! try_or(
     ($e:expr, $err:expr) => (match $e { Ok(e) => e, Err(_) => return $err })
@@ -112,6 +118,23 @@ impl Peer
         Ok(())
     }
 
+    fn send_getdata(&mut self, inv : &InvVect) -> Result<(),()>
+    {
+        let socket : &mut TcpStream = some_ref_or!(self.socket,ERR);
+        let getdata = GetData::from_inv(inv);
+
+        println!("<<< {}  {:30} command: {:9}",
+                 time::now().rfc822z(),
+                 self.addr,
+                 "getdata");
+
+        println!("{:4}",getdata);
+
+        try_or!(socket.write(getdata.serialize().as_slice()),ERR);
+
+        Ok(())
+    }
+
     /* Returns Err(true) if fatal error
      */
     pub fn read_message(&mut self) -> Result<Message,bool>
@@ -199,6 +222,14 @@ impl Peer
 
                 Ok(MsgInv(inv))
             },
+            "getdata" =>
+            {
+                let getdata : GetData;
+
+                getdata = GetData::unserialize(&data_msg);
+
+                Ok(MsgGetData(getdata))
+            },
             _ => ERR_OK
         }
     }
@@ -261,6 +292,12 @@ impl Peer
                 MsgInv(inv) =>
                 {
                     println!("{:4}",inv);
+
+                    try_or!(self.send_getdata(inv.get_invvect()),Err(()));
+                }
+                MsgGetData(getdata) =>
+                {
+                    println!("{:4}",getdata);
                 }
             };
         };
@@ -279,6 +316,7 @@ impl Peer
  * pong       v  |   v
  * addr       v  |   
  * inv        v  |   
+ * getdata       |   v
  *
  * TODO: we should ping
  */

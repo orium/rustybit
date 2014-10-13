@@ -1,6 +1,8 @@
 use std::fmt::Show;
 use std::fmt::Formatter;
 
+use std::clone::Clone;
+
 use message::header::Header;
 
 pub enum InvEntryType
@@ -33,6 +35,19 @@ impl Show for InvEntry
     }
 }
 
+
+impl Clone for InvEntry
+{
+    fn clone(&self) -> InvEntry
+    {
+        InvEntry
+        {
+            typ : self.typ,
+            hash: self.hash.clone()
+        }
+    }
+}
+
 pub struct InvVect
 {
     entries : Vec<InvEntry>
@@ -61,7 +76,7 @@ impl InvVect
 
     pub fn len(&self) -> uint
     {
-        self.len()
+        self.entries.len()
     }
 }
 
@@ -82,11 +97,23 @@ impl Show for InvVect
     }
 }
 
+impl Clone for InvVect
+{
+    fn clone(&self) -> InvVect
+    {
+        InvVect
+        {
+            entries: self.entries.clone()
+        }
+    }
+}
+
 
 pub struct Inv
 {
     vect : InvVect
 }
+
 
 #[allow(dead_code)]
 impl Inv
@@ -97,6 +124,11 @@ impl Inv
         {
             vect: InvVect::new()
         }
+    }
+
+    pub fn get_invvect(&self) -> &InvVect
+    {
+        &self.vect
     }
 
     pub fn add(&mut self, entry : InvEntry)

@@ -5,6 +5,7 @@ pub mod ping;
 pub mod pong;
 pub mod addresses;
 pub mod inv;
+pub mod getdata;
 
 pub enum Message
 {
@@ -14,4 +15,5 @@ pub enum Message
     MsgPong(pong::Pong),
     MsgAddresses(addresses::Addresses),
     MsgInv(inv::Inv),
+    MsgGetData(getdata::GetData),
 }

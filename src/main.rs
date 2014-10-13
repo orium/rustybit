@@ -42,6 +42,7 @@ fn main()
     for peer in peers.iter()
     {
         spawn_thread_handle_peer(*peer);
+        break;
     }
 }
 
