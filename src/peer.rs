@@ -148,6 +148,8 @@ impl Peer
         let now : Timespec = time::now_utc().to_timespec();
         let ping : Ping;
 
+        assert!(self.last_ping == None);
+
         ping = Ping::new(((now.sec as u64)<<10) | ((now.nsec as u64)/1_000_000));
 
         println!("<<< {}  {:30} command: {:9}",
@@ -156,8 +158,6 @@ impl Peer
                  "ping");
 
         try_or!(socket.write(ping.serialize().as_slice()),Err(WriteIOError));
-
-        self.last_ping = Some(time::now_utc().to_timespec());
 
         println!("{:4}",ping);
 
@@ -281,7 +281,12 @@ impl Peer
 
     fn periodic_sendping(&mut self) -> Result<(),PeerError>
     {
-        self.send_ping()
+        if self.last_ping.is_none()
+        {
+            return self.send_ping();
+        }
+
+        Ok(())
     }
 
     /* Warning: This ignores non fatal errors, i.e. it returns Ok with non-fatal
