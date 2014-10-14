@@ -11,11 +11,11 @@ pub struct Ping
 #[allow(dead_code)]
 impl Ping
 {
-    pub fn new() -> Ping
+    pub fn new(nounce : u64) -> Ping
     {
         Ping
         {
-            nounce: 0xababeface // TODO use OsRnd
+            nounce: nounce
         }
     }
 

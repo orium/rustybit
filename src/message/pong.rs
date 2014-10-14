@@ -18,6 +18,11 @@ impl Pong
         }
     }
 
+    pub fn get_nounce(&self) -> u64
+    {
+        self.nounce
+    }
+
     pub fn serialize(&self) -> Vec<u8>
     {
         let mut msg = ::marshalling::Marshalling::new();

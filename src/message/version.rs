@@ -45,7 +45,7 @@ impl Version
         self.proto_ver
     }
 
-    // TODO: create a trait for serialization
+    // TODO: create a trait for serialization (serialize::Encodable?)
     pub fn serialize(&self) -> Vec<u8>
     {
         let mut msg = ::marshalling::Marshalling::new();

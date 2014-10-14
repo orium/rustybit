@@ -28,14 +28,14 @@ fn spawn_thread_handle_peer(address : SocketAddr)
 
 fn main()
 {
-    let peers = [ //SocketAddr { ip: Ipv4Addr(127,0,0,1),    port: 8333 },
-                  //SocketAddr { ip: Ipv4Addr(192,168,1,2),  port: 8333 },
-                  //SocketAddr { ip: Ipv4Addr(93,93,135,12), port: 8333 }, /* UK */
-                  //SocketAddr { ip: Ipv4Addr(70,69,238,84), port: 8333 }, /* Canada */
+    let peers = [ SocketAddr { ip: Ipv4Addr(127,0,0,1),    port: 8333 },
+                  SocketAddr { ip: Ipv4Addr(192,168,1,2),  port: 8333 },
+                  SocketAddr { ip: Ipv4Addr(93,93,135,12), port: 8333 }, /* UK */
+                  SocketAddr { ip: Ipv4Addr(70,69,238,84), port: 8333 }, /* Canada */
                   SocketAddr { ip: Ipv4Addr(54,232,98,22), port: 8333 }, /* Brazil */
-                  //SocketAddr { ip: Ipv4Addr(5,9,7,180),    port: 8333 }, /* Germany */
-                  //SocketAddr { ip: Ipv4Addr(54,252,97,50), port: 8333 }, /* Australia */
-                  // SocketAddr { ip: Ipv4Addr(54,245,235,252), port: 8333 }, /* US */
+                  SocketAddr { ip: Ipv4Addr(5,9,7,180),    port: 8333 }, /* Germany */
+                  SocketAddr { ip: Ipv4Addr(54,252,97,50), port: 8333 }, /* Australia */
+                  SocketAddr { ip: Ipv4Addr(54,245,235,252), port: 8333 }, /* US */
                  ];
 
 
@@ -43,7 +43,6 @@ fn main()
     for peer in peers.iter()
     {
         spawn_thread_handle_peer(*peer);
-        break;
     }
 }
 
@@ -53,5 +52,4 @@ fn main()
  *    gracefully instead of terminating the program
  *    (eg. Unmarshalling::read_strvar()).
  *  * Logger
- *  * Error handling in peer.rs is ugly
  */
