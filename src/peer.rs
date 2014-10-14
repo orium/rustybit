@@ -457,7 +457,7 @@ impl MsgBuffer
 
         header = Header::unserialize(&self.buf);
 
-        if header.get_payload_len() > PAYLOAD_MAX_SIZE
+        if header.get_payload_size() > PAYLOAD_MAX_SIZE
         {
             println!("message payload length too big");
 
@@ -465,14 +465,14 @@ impl MsgBuffer
         }
 
         /* Read enoght to have the message payload */
-        try!(self.read_ensure_size(HEADER_SIZE+header.get_payload_len(),socket));
+        try!(self.read_ensure_size(HEADER_SIZE+header.get_payload_size(),socket));
 
-        assert!(self.buf.len() == HEADER_SIZE+header.get_payload_len());
+        assert!(self.buf.len() == HEADER_SIZE+header.get_payload_size());
 
         /* We can now safely drop the header, since we have a complete message */
         self.drop(HEADER_SIZE);
 
-        assert!(self.buf.len() == header.get_payload_len());
+        assert!(self.buf.len() == header.get_payload_size());
 
         if ::crypto::checksum(&self.buf) != header.get_checksum()
         {

@@ -216,8 +216,11 @@ impl Unmarshalling
 {
     pub fn new(data : &Vec<u8>) -> Unmarshalling
     {
-        Unmarshalling { buf: data.clone(),
-                        pos: 0}
+        Unmarshalling
+        {
+            buf: data.clone(),
+            pos: 0
+        }
     }
 
     pub fn read(&mut self, d : &mut [u8])

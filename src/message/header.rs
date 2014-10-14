@@ -38,7 +38,7 @@ impl Header
         &self.command
     }
 
-    pub fn get_payload_len(&self) -> uint
+    pub fn get_payload_size(&self) -> uint
     {
         self.len as uint
     }
