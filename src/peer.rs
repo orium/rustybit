@@ -65,6 +65,7 @@ impl PeerError
             NotConnected            => true,
             DoubleHandshake         => true,
             UnsupportedProtoVersion => true,
+            ReadMsgInvalidChecksum  => true,
             _                       => false
         }
     }
