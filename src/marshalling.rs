@@ -510,4 +510,9 @@ impl Unmarshalling
 
         invvec
     }
+
+    pub fn consumed(&self) -> uint
+    {
+        self.pos
+    }
 }

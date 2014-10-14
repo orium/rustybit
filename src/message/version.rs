@@ -69,7 +69,7 @@ impl Version
         header.serialize() + msg.get()
     }
 
-    pub fn unserialize(data : &Vec<u8>) -> Version
+    pub fn unserialize(data : &Vec<u8>, size : uint) -> Version
     {
         let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
         let proto_ver : u32;
@@ -90,7 +90,9 @@ impl Version
         nounce = unmarshalling.read_uint64();
         version = unmarshalling.read_varstr();
         best_height = unmarshalling.read_uint32();
-        relay = unmarshalling.read_bool();
+
+        relay = if unmarshalling.consumed() < size { unmarshalling.read_bool() }
+                                                   else { true };
 
         assert!(services == ::config::None as u64
                 || services == ::config::NodeNetwork as u64);

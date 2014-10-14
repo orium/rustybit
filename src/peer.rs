@@ -495,7 +495,8 @@ impl MsgBuffer
             {
                 let version : Version;
 
-                version = Version::unserialize(&self.buf);
+                version = Version::unserialize(&self.buf,
+                                               header.get_payload_size());
 
                 Ok(MsgVersion(version))
             },
