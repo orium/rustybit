@@ -458,8 +458,6 @@ impl Unmarshalling
                 ip:   addr,
                 port: port,
             });
-
-            assert!(port > 0);
         }
 
         NetAddr::new(time,services,socketaddr)
