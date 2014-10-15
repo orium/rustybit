@@ -49,6 +49,7 @@ pub enum PeerError
     NotConnected,
     DoubleHandshake,
     UnsupportedProtoVersion,
+    PingTimeout
 }
 
 impl PeerError
@@ -66,13 +67,18 @@ impl PeerError
             DoubleHandshake         => true,
             UnsupportedProtoVersion => true,
             ReadMsgInvalidChecksum  => true,
+            PingTimeout             => true,
             _                       => false
         }
     }
 }
 
 static PERIODIC_PERIOD_S : uint = 5;
-static PING_PERIOD_S : uint = 300;
+
+static PERIOD_PING_S : uint = 2*60;
+static PERIOD_TIMEOUT_CHECK_S : uint = 10;
+
+static TIMEOUT_S : uint = 10*60;
 
 pub struct Peer
 {
@@ -83,7 +89,7 @@ pub struct Peer
 }
 
 static PAYLOAD_MAX_SIZE : uint = 4*(1<<20); /* 4MB */
-static CONNECT_TIMEOUT_MS : uint = 5000;
+static CONNECT_TIMEOUT_MS : uint = 10000;
 
 impl Peer
 {
@@ -158,6 +164,8 @@ impl Peer
                  "ping");
 
         try_or!(socket.write(ping.serialize().as_slice()),Err(WriteIOError));
+
+        self.last_ping = Some(time::now_utc().to_timespec());
 
         println!("{:4}",ping);
 
@@ -242,6 +250,7 @@ impl Peer
         let nounce : u64 = pong.get_nounce();
         let then : Timespec;
         let lag : Duration;
+
         self.last_ping = None;
 
         then = Timespec::new((nounce>>10) as i64,
@@ -283,7 +292,23 @@ impl Peer
     {
         if self.last_ping.is_none()
         {
-            return self.send_ping();
+            try!(self.send_ping());
+        }
+
+        Ok(())
+    }
+
+    fn periodic_timeout_check(&mut self) -> Result<(),PeerError>
+    {
+        if self.last_ping.is_some()
+        {
+            let now : Timespec = time::now_utc().to_timespec();
+            let last : Timespec = self.last_ping.unwrap();
+
+            if now > last+Duration::seconds(TIMEOUT_S as i64)
+            {
+                return Err(PingTimeout);
+            }
         }
 
         Ok(())
@@ -302,7 +327,8 @@ impl Peer
 
                 result = match p.token()
                 {
-                    PeriodicPing => self.periodic_sendping(),
+                    PeriodicPing         => self.periodic_sendping(),
+                    PeriodicTimeoutCheck => self.periodic_timeout_check(),
                 };
 
                 match result
@@ -318,14 +344,25 @@ impl Peer
         Ok(())
     }
 
+    fn init_periodics() -> Vec<Periodic>
+    {
+        let mut periodics : Vec<Periodic> = Vec::new();
+
+        periodics.push(Periodic::new(Duration::seconds(PERIOD_PING_S as i64),
+                                     PeriodicPing));
+        periodics.push(Periodic::new(Duration::seconds(PERIOD_TIMEOUT_CHECK_S as i64),
+                                     PeriodicTimeoutCheck));
+
+        periodics
+    }
+
     pub fn read_loop(&mut self) -> Result<(),PeerError>
     {
         let mut buffer : MsgBuffer = MsgBuffer::new();
         let mut last_periodic : Timespec = time::now_utc().to_timespec();
-        let mut periodics : Vec<Periodic> = Vec::new();
+        let mut periodics : Vec<Periodic>;
 
-        periodics.push(Periodic::new(Duration::seconds(PING_PERIOD_S as i64),
-                                     PeriodicPing));
+        periodics = Peer::init_periodics();
 
         loop
         {
@@ -566,7 +603,8 @@ impl MsgBuffer
 
 enum PeriodicToken
 {
-    PeriodicPing
+    PeriodicPing,
+    PeriodicTimeoutCheck
 }
 
 /* TODO: Remove token and instead store a closure with the call to run.

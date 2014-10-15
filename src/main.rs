@@ -19,17 +19,22 @@ fn spawn_thread_handle_peer(address : SocketAddr)
     spawn(proc() {
         let mut peer : peer::Peer = peer::Peer::new(address);
 
+        /* TODO check results from these calls */
         try_proc!(peer.connect());
         try_proc!(peer.send_version());
 
-        try_proc!(peer.read_loop());
+        match peer.read_loop()
+        {
+            Err(err) => println!("{} Error: {}",address,err),
+            _        => unreachable!()
+        }
     });
 }
 
 fn main()
 {
-    let peers = [ //SocketAddr { ip: Ipv4Addr(127,0,0,1),    port: 8333 },
-                  //SocketAddr { ip: Ipv4Addr(192,168,1,2),  port: 8333 },
+    let peers = [ SocketAddr { ip: Ipv4Addr(127,0,0,1),    port: 8333 },
+                  SocketAddr { ip: Ipv4Addr(192,168,1,2),  port: 8333 },
                   SocketAddr { ip: Ipv4Addr(93,93,135,12), port: 8333 }, /* UK */
                   SocketAddr { ip: Ipv4Addr(93,93,135,12), port: 8333 }, /* UK */
                   SocketAddr { ip: Ipv4Addr(70,69,238,84), port: 8333 }, /* Canada */
@@ -53,7 +58,6 @@ fn main()
                   SocketAddr { ip: Ipv4Addr(176,241,243,15), port: 8333 }, /* Poland */
                   SocketAddr { ip: Ipv4Addr(149,210,133,244), port: 8333 }, /* Netherlands */
                   SocketAddr { ip: Ipv4Addr(54,246,85,246), port: 8333 }, /* Ireland */
-                  SocketAddr { ip: Ipv4Addr(87,229,73,171), port: 8333 }, /* Hungary */
                   SocketAddr { ip: Ipv4Addr(82,209,206,37), port: 8333 }, /* Belarus */
                  ];
 
