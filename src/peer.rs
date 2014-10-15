@@ -34,6 +34,8 @@ macro_rules! try_or(
 macro_rules! some_ref_or(
     ($e:expr, $err:expr) => (match $e { Some(ref mut e) => e, None => return $err }))
 
+/* TODO: Add information, i.e. ReadIOError(ioerror); PingTimeout(timeout)
+ */
 #[deriving(Show)]
 pub enum PeerError
 {
@@ -45,6 +47,7 @@ pub enum PeerError
     ReadMsgInvalidChecksum,
     ReadMsgUnknownMsg,
     WriteIOError,
+    WriteTimeout,
     ConnectIOError,
     NotConnected,
     DoubleHandshake,
@@ -62,6 +65,7 @@ impl PeerError
             ReadIOError             => true,
             ReadMsgPayloadTooBig    => true,
             WriteIOError            => true,
+            WriteTimeout            => true,
             ConnectIOError          => true,
             NotConnected            => true,
             DoubleHandshake         => true,
@@ -89,7 +93,8 @@ pub struct Peer
 }
 
 static PAYLOAD_MAX_SIZE : uint = 4*(1<<20); /* 4MB */
-static CONNECT_TIMEOUT_MS : uint = 10000;
+static TIMEOUT_CONNECT_MS : uint = 10000;
+static TIMEOUT_WRITE_MS : uint = 5*60*1000;
 
 impl Peer
 {
@@ -106,7 +111,7 @@ impl Peer
 
     pub fn connect(&mut self) -> Result<(),PeerError>
     {
-        let timeout : Duration = Duration::milliseconds(CONNECT_TIMEOUT_MS as i64);
+        let timeout : Duration = Duration::milliseconds(TIMEOUT_CONNECT_MS as i64);
         let maybesocket = TcpStream::connect_timeout(self.addr,timeout);
 
         self.socket = Some(try_or!(maybesocket,Err(ConnectIOError)));
@@ -114,9 +119,29 @@ impl Peer
         Ok(())
     }
 
-    pub fn send_version(&mut self) -> Result<(),PeerError>
+    fn send(&mut self, msg : &Vec<u8>) -> Result<(),PeerError>
     {
         let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
+        let result;
+
+        socket.set_write_timeout(Some(TIMEOUT_WRITE_MS as u64));
+
+        result = socket.write(msg.as_slice());
+
+        if result.is_err()
+        {
+            match result.err().unwrap().kind
+            {
+                ::std::io::TimedOut  => return Err(WriteTimeout),
+                _                    => return Err(WriteIOError)
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn send_version(&mut self) -> Result<(),PeerError>
+    {
         let version = Version::new(::config::name_version_bip0014(),0);
 
         println!("<<< {}  {:30} command: {:9}",
@@ -124,7 +149,7 @@ impl Peer
                  self.addr,
                  "version");
 
-        try_or!(socket.write(version.serialize().as_slice()),Err(WriteIOError));
+        try!(self.send(&version.serialize()));
 
         println!("{:4}",version);
 
@@ -133,7 +158,6 @@ impl Peer
 
     fn send_versionack(&mut self) -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
         let verack = VersionAck::new();
 
         println!("<<< {}  {:30} command: {:9}",
@@ -141,7 +165,7 @@ impl Peer
                  self.addr,
                  "verack");
 
-        try_or!(socket.write(verack.serialize().as_slice()),Err(WriteIOError));
+        try!(self.send(&verack.serialize()));
 
         println!("{:4}",verack);
 
@@ -150,7 +174,6 @@ impl Peer
 
     fn send_ping(&mut self) -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
         let now : Timespec = time::now_utc().to_timespec();
         let ping : Ping;
 
@@ -163,7 +186,7 @@ impl Peer
                  self.addr,
                  "ping");
 
-        try_or!(socket.write(ping.serialize().as_slice()),Err(WriteIOError));
+        try!(self.send(&ping.serialize()));
 
         self.last_ping = Some(time::now_utc().to_timespec());
 
@@ -174,7 +197,6 @@ impl Peer
 
     fn send_pong(&mut self, nounce : u64) -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
         let pong = Pong::new(nounce);
 
         println!("<<< {}  {:30} command: {:9}",
@@ -182,7 +204,7 @@ impl Peer
                  self.addr,
                  "pong");
 
-        try_or!(socket.write(pong.serialize().as_slice()),Err(WriteIOError));
+        try!(self.send(&pong.serialize()));
 
         println!("{:4}",pong);
 
@@ -191,7 +213,6 @@ impl Peer
 
     fn send_getdata(&mut self, inv : &InvVect) -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
         let getdata = GetData::from_inv(inv);
 
         println!("<<< {}  {:30} command: {:9}",
@@ -199,7 +220,7 @@ impl Peer
                  self.addr,
                  "getdata");
 
-        try_or!(socket.write(getdata.serialize().as_slice()),Err(WriteIOError));
+        try!(self.send(&getdata.serialize()));
 
         println!("{:4}",getdata);
 
@@ -415,7 +436,7 @@ impl Peer
     }
 }
 
-static READ_TIMEOUT_MS : uint = 500;
+static TIMEOUT_READ_MS : uint = 500;
 
 struct MsgBuffer
 {
@@ -455,7 +476,7 @@ impl MsgBuffer
         {
             let result;
 
-            socket.set_read_timeout(Some(READ_TIMEOUT_MS as u64));
+            socket.set_read_timeout(Some(TIMEOUT_READ_MS as u64));
             result = socket.push(size-self.buf.len(),&mut self.buf);
 
             if result.is_err()
