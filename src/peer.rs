@@ -14,6 +14,7 @@ use message::MsgPong;
 use message::MsgAddresses;
 use message::MsgInv;
 use message::MsgGetData;
+use message::MsgReject;
 
 use message::version::Version;
 use message::versionack::VersionAck;
@@ -22,6 +23,7 @@ use message::pong::Pong;
 use message::addresses::Addresses;
 use message::inv::Inv;
 use message::getdata::GetData;
+use message::reject::Reject;
 
 use datatype::invvect::InvVect;
 
@@ -302,6 +304,13 @@ impl Peer
         Ok(())
     }
 
+    fn handle_reject(&mut self, reject : Reject) -> Result<(),PeerError>
+    {
+        println!("{:4}",reject);
+
+        Ok(())
+    }
+
     fn periodic_sendping(&mut self) -> Result<(),PeerError>
     {
         if self.last_ping.is_none()
@@ -418,6 +427,7 @@ impl Peer
                 MsgAddresses(addrs)   => self.handle_addresses(addrs),
                 MsgInv(inv)           => self.handle_inv(inv),
                 MsgGetData(getdata)   => self.handle_getdata(getdata),
+                MsgReject(reject)     => self.handle_reject(reject),
             };
 
             match result
@@ -480,13 +490,30 @@ impl Periodic
 
 /* Progress:
  *
- *          recv | send
- * ______________________
- * version    v  |   v
- * verack     v  |   v
- * ping       v  |   v
- * pong       v  |   v
- * addr       v  |   
- * inv        v  |   
- * getdata       |   v
+ *                recv | send
+ * ___________________________
+ * version          v  |   v
+ * verack           v  |   v
+ * ping             v  |   v
+ * pong             v  |   v
+ * addr             v  |
+ * inv              v  |
+ * getdata             |   v
+ * reject           v  |
+ * tx                  |
+ * block               |
+ * notfound            |
+ * getblocks           |
+ * getheaders          |
+ * headers             |
+ * getaddr             |
+ *
+ *
+ * Later:
+ *     filterload
+ *     filteradd
+ *     filterclear
+ *     merkleblock
+ *     mempool
+ *     alert
  */
