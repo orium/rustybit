@@ -10,6 +10,7 @@ use message::MsgPong;
 use message::MsgAddresses;
 use message::MsgInv;
 use message::MsgGetData;
+use message::MsgReject;
 
 use message::version::Version;
 use message::versionack::VersionAck;
@@ -18,6 +19,7 @@ use message::pong::Pong;
 use message::addresses::Addresses;
 use message::inv::Inv;
 use message::getdata::GetData;
+use message::reject::Reject;
 
 use message::header::Header;
 use message::header::HEADER_SIZE;
@@ -217,6 +219,14 @@ impl MsgBuffer
                 getdata = GetData::unserialize(&self.buf);
 
                 Ok(MsgGetData(getdata))
+            },
+            "reject" =>
+            {
+                let reject : Reject;
+
+                reject = Reject::unserialize(&self.buf);
+
+                Ok(MsgReject(reject))
             },
             _ => Err(ReadMsgUnknownCommand)
         };

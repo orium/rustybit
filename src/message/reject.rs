@@ -42,6 +42,7 @@ pub struct Reject
     reason : String
 }
 
+#[allow(dead_code)]
 impl Reject
 {
     pub fn new(msg : String, typ : RejectType, reason : String) -> Reject
@@ -100,6 +101,6 @@ impl Show for Reject
         let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
         let space = String::from_str(" ").repeat(width);
 
-        write!(f,"{}Reject {} {} {}", space, self.msg, self.typ, self.reason)
+        write!(f,"{}Reject {} {} \"{}\"", space, self.msg, self.typ, self.reason)
     }
 }
