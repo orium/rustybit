@@ -34,8 +34,8 @@ pub fn version() -> String
     {
         Some(ref suf) => format!("{}.{}.{}-{}",VERSION_MAJOR,VERSION_MINOR,
                                            VERSION_FIXES,suf),
-        None      => format!("{}.{}.{}",VERSION_MAJOR,VERSION_MINOR,
-                                        VERSION_FIXES)
+        None          => format!("{}.{}.{}",VERSION_MAJOR,VERSION_MINOR,
+                                            VERSION_FIXES)
     }
 }
 

@@ -72,4 +72,5 @@ fn main()
  *    gracefully instead of terminating the program
  *    (eg. Unmarshalling::read_strvar()).
  *  * Logger
+ *  * flags --help and --version
  */
