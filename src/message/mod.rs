@@ -6,6 +6,7 @@ pub mod pong;
 pub mod addresses;
 pub mod inv;
 pub mod getdata;
+pub mod reject;
 
 pub enum Message
 {
@@ -16,4 +17,5 @@ pub enum Message
     MsgAddresses(addresses::Addresses),
     MsgInv(inv::Inv),
     MsgGetData(getdata::GetData),
+    MsgReject(reject::Reject)
 }
