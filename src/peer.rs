@@ -28,9 +28,6 @@ use message::getdata::GetData;
 
 use datatype::invvect::InvVect;
 
-macro_rules! try_or(
-    ($e:expr, $err:expr) => (match $e { Ok(e) => e, Err(_) => return $err }))
-
 macro_rules! some_ref_or(
     ($e:expr, $err:expr) => (match $e { Some(ref mut e) => e, None => return $err }))
 
@@ -48,7 +45,7 @@ pub enum PeerError
     ReadMsgUnknownMsg,
     WriteIOError,
     WriteTimeout,
-    ConnectIOError,
+    ConnectError,
     NotConnected,
     DoubleHandshake,
     UnsupportedProtoVersion,
@@ -66,7 +63,7 @@ impl PeerError
             ReadMsgPayloadTooBig    => true,
             WriteIOError            => true,
             WriteTimeout            => true,
-            ConnectIOError          => true,
+            ConnectError            => true,
             NotConnected            => true,
             DoubleHandshake         => true,
             UnsupportedProtoVersion => true,
@@ -114,7 +111,12 @@ impl Peer
         let timeout : Duration = Duration::milliseconds(TIMEOUT_CONNECT_MS as i64);
         let maybesocket = TcpStream::connect_timeout(self.addr,timeout);
 
-        self.socket = Some(try_or!(maybesocket,Err(ConnectIOError)));
+        if maybesocket.is_err()
+        {
+            return Err(ConnectError);
+        }
+
+        self.socket = Some(maybesocket.unwrap());
 
         Ok(())
     }
