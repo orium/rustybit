@@ -99,6 +99,7 @@ impl Marshalling
         let bytes : &[u8] = str.as_bytes();
 
         assert!(bytes.len() <= 12);
+        assert!(Unmarshalling::sanitize_string(str) == *str);
 
         for b in bytes.iter()
         {
@@ -114,6 +115,10 @@ impl Marshalling
     pub fn write_varstr(&mut self, str : &String)
     {
         let bytes : &[u8] = str.as_bytes();
+
+        println!(".{}.{}.",Unmarshalling::sanitize_string(str),*str);
+
+        assert!(Unmarshalling::sanitize_string(str) == *str);
 
         self.write_varint(bytes.len() as u64);
 
@@ -333,17 +338,19 @@ impl Unmarshalling
         }
     }
 
-    fn is_string_sane(str : &String) -> bool
+    pub fn sanitize_string(str : &String) -> String
     {
+        let mut r : String = String::new();
+
         for ch in str.as_slice().chars()
         {
-            if !VARSTR_SAFE_CHARS.contains_char(ch)
+            if VARSTR_SAFE_CHARS.contains_char(ch)
             {
-                return false;
+                r.push(ch);
             }
         }
 
-        true
+        r
     }
 
     pub fn read_str12(&mut self) -> String
@@ -364,11 +371,9 @@ impl Unmarshalling
 
         self.pos += 12;
 
-        /* TODO Must be all zeros after the first zero */
+        /* TODO Should be all zeros after the first zero */
 
-        assert!(Unmarshalling::is_string_sane(&str));
-
-        str
+        Unmarshalling::sanitize_string(&str)
     }
 
     pub fn read_varstr(&mut self) -> String
@@ -387,9 +392,7 @@ impl Unmarshalling
             assert!(self.pos <= self.buf.len());
         }
 
-        assert!(Unmarshalling::is_string_sane(&str));
-
-        str
+        Unmarshalling::sanitize_string(&str)
     }
 
     pub fn read_timestampu32(&mut self) -> time::Timespec

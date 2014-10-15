@@ -33,7 +33,7 @@ pub fn version() -> String
     match VERSION_SUFIX
     {
         Some(ref suf) => format!("{}.{}.{}-{}",VERSION_MAJOR,VERSION_MINOR,
-                                           VERSION_FIXES,suf),
+                                               VERSION_FIXES,suf),
         None          => format!("{}.{}.{}",VERSION_MAJOR,VERSION_MINOR,
                                             VERSION_FIXES)
     }
@@ -50,5 +50,5 @@ pub fn name_version() -> String
  */
 pub fn name_version_bip0014() -> String
 {
-    format!("/{}:{}/",NAME,version())
+    format!("/{}:{}/",NAME,version().replace("-","_"))
 }
