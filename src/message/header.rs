@@ -43,6 +43,11 @@ impl Header
         self.len as uint
     }
 
+    pub fn get_network(&self) -> u32
+    {
+        self.network
+    }
+
     pub fn serialize(&self) -> Vec<u8>
     {
         let mut header = ::marshalling::Marshalling::new();

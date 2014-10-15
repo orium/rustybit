@@ -48,7 +48,8 @@ pub enum PeerError
     NotConnected,
     DoubleHandshake,
     UnsupportedProtoVersion,
-    PingTimeout
+    PingTimeout,
+    WrongNetwork
 }
 
 impl PeerError
@@ -68,6 +69,7 @@ impl PeerError
             UnsupportedProtoVersion => true,
             ReadMsgInvalidChecksum  => true,
             PingTimeout             => true,
+            WrongNetwork            => true,
             _                       => false
         }
     }

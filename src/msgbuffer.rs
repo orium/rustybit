@@ -30,6 +30,7 @@ use peer::ReadIOError;
 use peer::ReadMsgPayloadTooBig;
 use peer::ReadMsgInvalidChecksum;
 use peer::ReadMsgUnknownMsg;
+use peer::WrongNetwork;
 
 static PAYLOAD_MAX_SIZE : uint = 4*(1<<20); /* 4MB */
 
@@ -213,7 +214,10 @@ impl MsgBuffer
 
         self.buf.clear();
 
-        /* TODO check network */
+        if header.get_network() != ::config::NETWORK
+        {
+            return Err(WrongNetwork);
+        }
 
         msg
     }
