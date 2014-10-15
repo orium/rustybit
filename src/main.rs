@@ -10,20 +10,20 @@ mod crypto;
 mod message;
 mod peer;
 
-macro_rules! try_proc(
-    ($e:expr) => (if $e.is_err() { return; })
-)
+fn handle_peer(address : SocketAddr) -> Result<(),peer::PeerError>
+{
+    let mut peer : peer::Peer = peer::Peer::new(address);
+
+    try!(peer.connect());
+    try!(peer.send_version());
+
+    peer.read_loop()
+}
 
 fn spawn_thread_handle_peer(address : SocketAddr)
 {
     spawn(proc() {
-        let mut peer : peer::Peer = peer::Peer::new(address);
-
-        /* TODO check results from these calls */
-        try_proc!(peer.connect());
-        try_proc!(peer.send_version());
-
-        match peer.read_loop()
+        match handle_peer(address)
         {
             Err(err) => println!("{} Error: {}",address,err),
             _        => unreachable!()
@@ -47,9 +47,7 @@ fn main()
                   SocketAddr { ip: Ipv4Addr(66,114,33,250), port: 8333 }, /* US */
                   SocketAddr { ip: Ipv4Addr(204,27,61,162), port: 8333 }, /* US */
                   SocketAddr { ip: Ipv4Addr(192,198,92,99), port: 8333 }, /* US */
-                  SocketAddr { ip: Ipv4Addr(120,69,127,84), port: 8333 }, /* China */
                   SocketAddr { ip: Ipv4Addr(91,220,163,18), port: 8333 }, /* Ukraine */
-                  SocketAddr { ip: Ipv4Addr(193,11,162,112), port: 8333 }, /* Sweden */
                   SocketAddr { ip: Ipv4Addr(193,107,19,83), port: 8333 }, /* Russia */
                   SocketAddr { ip: Ipv4Addr(5,100,123,19), port: 8333 }, /* Russia */
                   SocketAddr { ip: Ipv4Addr(195,197,175,190), port: 8333 }, /* Finland */
