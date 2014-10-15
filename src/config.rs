@@ -4,6 +4,8 @@ pub static VERSION_MAJOR : u8 = 0;
 pub static VERSION_MINOR : u8 = 0;
 pub static VERSION_FIXES : u8 = 0;
 
+pub static VERSION_SUFIX : Option<&'static str> = Some("dev");
+
 pub enum Network
 {
     MainNet = 0xD9B4BEF9
@@ -18,7 +20,7 @@ pub static PROTOCOL_VERSION_MIN : u32 = 70002;
 
 pub enum Service
 {
-    None        = 0,
+    NoService   = 0,
     NodeNetwork = 1 << 0,
 }
 
@@ -28,7 +30,13 @@ pub static SERVICES : Services = NodeNetwork as Services;
 
 pub fn version() -> String
 {
-    format!("{}.{}.{}",VERSION_MAJOR,VERSION_MINOR,VERSION_FIXES)
+    match VERSION_SUFIX
+    {
+        Some(ref suf) => format!("{}.{}.{}-{}",VERSION_MAJOR,VERSION_MINOR,
+                                           VERSION_FIXES,suf),
+        None      => format!("{}.{}.{}",VERSION_MAJOR,VERSION_MINOR,
+                                        VERSION_FIXES)
+    }
 }
 
 #[allow(dead_code)]

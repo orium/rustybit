@@ -94,7 +94,7 @@ impl Version
         relay = if unmarshalling.consumed() < size { unmarshalling.read_bool() }
                                                    else { true };
 
-        assert!(services == ::config::None as u64
+        assert!(services == ::config::NoService as u64
                 || services == ::config::NodeNetwork as u64);
 
         Version

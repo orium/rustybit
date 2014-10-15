@@ -1,8 +1,8 @@
 [package]
 
 name = "rustybit"
-version = "0.0.0"
-authors = ["Diogo Sousa <diogogsousa@gmail.com"]
+version = "0.0.0-dev"
+authors = ["Diogo Sousa <diogogsousa@gmail.com>"]
 
 [dependencies.openssl]
 git = "https://github.com/sfackler/rust-openssl.git"
