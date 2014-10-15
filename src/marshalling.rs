@@ -28,6 +28,11 @@ impl Marshalling
         self.buf.push_all(d);
     }
 
+    pub fn write_uint8(&mut self, v : u8)
+    {
+        self.buf.push(v);
+    }
+
     pub fn write_uint16(&mut self, v : u16)
     {
         for i in range(0u,2)
@@ -76,7 +81,7 @@ impl Marshalling
         match v
         {
             0u64           ... 252u64                => {
-                self.buf.push(v as u8);
+                self.write_uint8(v as u8);
             },
             253u64         ... 0xffffu64             => {
                 self.buf.push(253u8);
@@ -242,6 +247,16 @@ impl Unmarshalling
     pub fn skip(&mut self, s : uint)
     {
         self.pos += s;
+    }
+
+    pub fn read_uint8(&mut self) -> u8
+    {
+        let v : u8;
+
+        v = self.buf[self.pos];
+        self.pos += 1;
+
+        v
     }
 
     pub fn read_uint16(&mut self) -> u16
