@@ -7,6 +7,7 @@ mod config;
 mod datatype;
 mod marshalling;
 mod crypto;
+mod msgbuffer;
 mod message;
 mod peer;
 
