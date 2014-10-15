@@ -41,15 +41,15 @@ pub enum PeerError
     ReadIOError,
     ReadMsgPayloadTooBig,
     ReadMsgInvalidChecksum,
-    ReadMsgUnknownMsg,
+    ReadMsgUnknownCommand,
+    ReadMsgWrongNetwork,
     WriteIOError,
     WriteTimeout,
     ConnectError,
     NotConnected,
     DoubleHandshake,
     UnsupportedProtoVersion,
-    PingTimeout,
-    WrongNetwork
+    PingTimeout
 }
 
 impl PeerError
@@ -58,19 +58,10 @@ impl PeerError
     {
         match *self
         {
-            ReadEOF                 => true,
-            ReadIOError             => true,
-            ReadMsgPayloadTooBig    => true,
-            WriteIOError            => true,
-            WriteTimeout            => true,
-            ConnectError            => true,
-            NotConnected            => true,
-            DoubleHandshake         => true,
-            UnsupportedProtoVersion => true,
-            ReadMsgInvalidChecksum  => true,
-            PingTimeout             => true,
-            WrongNetwork            => true,
-            _                       => false
+            ReadTimeout           => false,
+            ReadIncomplete        => false,
+            ReadMsgUnknownCommand => false,
+            _                     => true
         }
     }
 }

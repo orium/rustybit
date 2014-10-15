@@ -29,8 +29,8 @@ use peer::ReadIncomplete;
 use peer::ReadIOError;
 use peer::ReadMsgPayloadTooBig;
 use peer::ReadMsgInvalidChecksum;
-use peer::ReadMsgUnknownMsg;
-use peer::WrongNetwork;
+use peer::ReadMsgWrongNetwork;
+use peer::ReadMsgUnknownCommand;
 
 static PAYLOAD_MAX_SIZE : uint = 4*(1<<20); /* 4MB */
 
@@ -145,6 +145,15 @@ impl MsgBuffer
             return Err(ReadMsgInvalidChecksum);
         }
 
+        if header.get_network() != ::config::NETWORK
+        {
+            println!("wrong network");
+
+            self.buf.clear();
+
+            return Err(ReadMsgWrongNetwork);
+        }
+
         println!(">>> {}  {} \tcommand: {:9}",
                  time::now().rfc822z(),
                  socket.peer_name().unwrap(),
@@ -209,15 +218,10 @@ impl MsgBuffer
 
                 Ok(MsgGetData(getdata))
             },
-            _ => Err(ReadMsgUnknownMsg)
+            _ => Err(ReadMsgUnknownCommand)
         };
 
         self.buf.clear();
-
-        if header.get_network() != ::config::NETWORK
-        {
-            return Err(WrongNetwork);
-        }
 
         msg
     }
