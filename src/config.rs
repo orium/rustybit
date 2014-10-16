@@ -11,7 +11,7 @@ pub enum Network
     MainNet = 0xD9B4BEF9
 }
 
-pub static NETWORK : u32 = MainNet as u32; /* This should be of type Network */
+pub static NETWORK : u32 = MainNet as u32; /* TODO This should be of type Network */
 
 pub static PROTOCOL_VERSION : u32 = 70002;
 
