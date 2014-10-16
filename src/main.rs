@@ -1,7 +1,11 @@
 #![feature(macro_rules)]
 
+extern crate getopts;
+
 use std::io::net::ip::SocketAddr;
 use std::io::net::ip::Ipv4Addr;
+
+use getopts::optflag;
 
 mod config;
 mod datatype;
@@ -10,6 +14,64 @@ mod crypto;
 mod msgbuffer;
 mod message;
 mod peer;
+
+struct Options
+{
+    help    : bool,
+    version : bool
+}
+
+pub static OPT_DESC_HELP : &'static str
+    = "Display this help and exit";
+pub static OPT_DESC_VERSION : &'static str
+    = "Output version information and exit";
+
+#[allow(unused_must_use)]
+fn print_usage(out : &mut std::io::LineBufferedWriter<std::io::stdio::StdWriter>)
+{
+    let program : &String = &std::os::args()[0];
+
+    print_version(out);
+
+    write!(out,"Usage: {} [OPTIONS]\n", program);
+    write!(out,"\n");
+    write!(out,"Options:\n");
+    write!(out,"  -h, --help     {}\n",OPT_DESC_HELP);
+    write!(out,"  -v, --version  {}\n",OPT_DESC_VERSION);
+}
+
+#[allow(unused_must_use)]
+fn print_version(out : &mut std::io::LineBufferedWriter<std::io::stdio::StdWriter>)
+{
+    write!(out, "{}\n",config::name_version());
+}
+
+fn parse_options() -> Option<Options>
+{
+    let opts = [ optflag("h", "help",    OPT_DESC_HELP),
+                 optflag("v", "version", OPT_DESC_VERSION) ];
+    let matches : getopts::Matches;
+
+    matches = match getopts::getopts(std::os::args().as_slice(), opts) {
+        Ok(m) => m,
+        Err(e) => {
+            (write!(std::io::stderr(),"error: {}\n", e)).unwrap();
+            return None;
+        }
+    };
+
+    if matches.free.len() > 1
+    {
+        print_usage(&mut std::io::stderr());
+        return None;
+    }
+
+    Some(Options
+         {
+             help:    matches.opt_present("h"),
+             version: matches.opt_present("v")
+         })
+}
 
 fn handle_peer(address : SocketAddr) -> Result<(),peer::PeerError>
 {
@@ -26,7 +88,10 @@ fn spawn_thread_handle_peer(address : SocketAddr)
     spawn(proc() {
         match handle_peer(address)
         {
-            Err(err) => println!("{} Error: {}",address,err),
+            Err(err) =>
+            {
+                (write!(std::io::stderr(),"{} Error: {}\n",address,err)).unwrap();
+            },
             _        => unreachable!()
         }
     });
@@ -59,6 +124,27 @@ fn main()
                   SocketAddr { ip: Ipv4Addr(54,246,85,246), port: 8333 }, /* Ireland */
                   SocketAddr { ip: Ipv4Addr(82,209,206,37), port: 8333 }, /* Belarus */
                  ];
+    let options : Options;
+
+    options = match parse_options() {
+        Some(opt) => opt,
+        None      =>
+        {
+            std::os::set_exit_status(-1);
+            return;
+        }
+    };
+
+    if options.help
+    {
+        print_usage(&mut std::io::stdout());
+        return;
+    }
+    else if options.version
+    {
+        print_version(&mut std::io::stdout());
+        return;
+    }
 
     for peer in peers.iter()
     {
@@ -72,5 +158,4 @@ fn main()
  *    gracefully instead of terminating the program
  *    (eg. Unmarshalling::read_strvar()).
  *  * Logger
- *  * flags --help and --version
  */
