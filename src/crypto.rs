@@ -1,5 +1,8 @@
 extern crate openssl;
 
+use std::path::Path;
+use std::io::File;
+
 use self::openssl::crypto::hash::{SHA256,Hasher};
 
 pub fn sha256(data : &Vec<u8>) -> Vec<u8>
@@ -39,3 +42,22 @@ pub fn hash_to_hexstr(hash : &Vec<u8>) -> String
 
     str
 }
+
+pub fn rand() -> u64
+{
+    /* TODO: For some reason the OsRnd does not seem to work, so we do this here.
+     */
+    let mut reader;
+    let v;
+
+    reader = File::open(&Path::new("/dev/urandom"));
+
+    assert!(reader.is_ok());
+
+    v = reader.ok().unwrap().read_le_u64();
+
+    assert!(v.is_ok());
+
+    v.ok().unwrap()
+}
+
