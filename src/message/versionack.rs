@@ -24,8 +24,7 @@ impl VersionAck
         header.serialize()
     }
 
-    #[allow(unused_variable)]
-    pub fn unserialize(data : &Vec<u8>) -> VersionAck
+    pub fn unserialize(_data : &Vec<u8>) -> VersionAck
     {
         VersionAck::new()
     }
