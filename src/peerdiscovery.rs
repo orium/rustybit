@@ -174,7 +174,7 @@ pub fn discover_peers(count : uint) -> Vec<SocketAddr>
         match peers_by_method.get_mut(method).pop()
         {
             Some(addr) => peers.push(addr),
-            None => ()
+            None       => ()
         }
     }
 
