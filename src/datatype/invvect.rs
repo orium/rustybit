@@ -51,7 +51,6 @@ pub struct InvVect
     entries : Vec<InvEntry>
 }
 
-#[allow(dead_code)]
 impl InvVect
 {
     pub fn new() -> InvVect
@@ -67,14 +66,14 @@ impl InvVect
         self.entries.push(entry)
     }
 
-    pub fn get(&self, i : uint) -> &InvEntry
-    {
-        &self.entries[i]
-    }
-
     pub fn len(&self) -> uint
     {
         self.entries.len()
+    }
+
+    pub fn iter(&self) -> ::std::slice::Items<InvEntry>
+    {
+        self.entries.iter()
     }
 }
 

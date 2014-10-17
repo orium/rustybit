@@ -195,10 +195,8 @@ impl Marshalling
     {
         self.write_varint(invvec.len() as u64);
 
-        for i in range(0,invvec.len())
+        for entry in invvec.iter()
         {
-            let entry : &::datatype::invvect::InvEntry = invvec.get(i);
-
             self.write_uint32(entry.typ as u32);
             self.write_hash(&entry.hash);
         }
