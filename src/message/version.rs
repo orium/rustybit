@@ -1,5 +1,7 @@
 extern crate time;
 
+use std::rand::Rng;
+
 use std::fmt::Show;
 use std::fmt::Formatter;
 
@@ -32,7 +34,7 @@ impl Version
             addr_recv:   NetAddr::new(None,::config::SERVICES,None),
             addr_send:   NetAddr::new(None,::config::SERVICES,None),
             best_height: best_height,
-            nounce:      ::crypto::rand(),
+            nounce:      ::crypto::rng().gen(),
             relay:       true
         }
     }

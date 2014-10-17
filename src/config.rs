@@ -28,6 +28,8 @@ pub type Services = u64;
 
 pub static SERVICES : Services = NodeNetwork as Services;
 
+pub static INITIAL_DISCOVERY_PEERS : uint = 10;
+
 pub fn version() -> String
 {
     match VERSION_SUFIX
