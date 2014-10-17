@@ -30,6 +30,8 @@ pub static SERVICES : Services = NodeNetwork as Services;
 
 pub static INITIAL_DISCOVERY_PEERS : uint = 20;
 
+pub static DEFAULT_PORT : u16 = 8333;
+
 pub fn version() -> String
 {
     match VERSION_SUFIX

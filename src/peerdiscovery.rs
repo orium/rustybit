@@ -21,6 +21,8 @@ use self::http::client::RequestWriter;
 use self::http::method::Get;
 use self::http::client::ResponseReader;
 
+use std::io::net::addrinfo::get_host_addresses;
+
 macro_rules! try_err_nil(
     ($e:expr) => (match $e { Ok(e) => e, Err(_) => return Err(()) }))
 
@@ -129,8 +131,6 @@ fn discover_getaddr_bitnodes_io() -> Vec<SocketAddr>
             continue;
         }
 
-        println!("{}",addr);
-
         sock_addr = match from_str::<SocketAddr>(addr.as_slice()) {
             Some(addr) => addr,
             None    => continue
@@ -139,7 +139,47 @@ fn discover_getaddr_bitnodes_io() -> Vec<SocketAddr>
         match sock_addr.ip
         {
             Ipv4Addr(..) => peers.push(sock_addr),
-            Ipv6Addr(..) => () /* TODO check if configuration allows ipv6 addresses*/
+            Ipv6Addr(..) => () /* TODO check if configuration allows ipv6 addresses */
+        }
+    }
+
+    peers
+}
+
+/* TODO: it might make sense to have a timeout in the http GET.
+ */
+fn discover_dns_lookup_seeds() -> Vec<SocketAddr>
+{
+    let hostnames = [ "seed.bitcoin.sipa.be",
+                       "dnsseed.bluematt.me",
+                       "dnsseed.bitcoin.dashjr.org",
+                       "seed.bitcoinstats.com",
+                       "seed.bitnodes.io",
+                       "bitseed.xf2.org" ];
+    let mut peers : Vec<SocketAddr> = Vec::new();
+
+    for hostname in hostnames.iter()
+    {
+        let result = get_host_addresses(*hostname);
+
+        if result.is_err()
+        {
+            continue;
+        }
+
+        for addr in result.ok().unwrap().iter()
+        {
+            match *addr
+            {
+                Ipv4Addr(..) =>
+                {
+                    let sock_addr = SocketAddr { ip: *addr,
+                                                 port: ::config::DEFAULT_PORT };
+
+                    peers.push(sock_addr);
+                },
+                Ipv6Addr(..) => () /* TODO check if configuration allows ipv6 addresses */
+            }
         }
     }
 
@@ -149,7 +189,8 @@ fn discover_getaddr_bitnodes_io() -> Vec<SocketAddr>
 pub fn discover_peers(count : uint) -> Vec<SocketAddr>
 {
     let discovery_methods = [ discover_hardcoded,
-                              discover_getaddr_bitnodes_io ];
+                              discover_getaddr_bitnodes_io,
+                              discover_dns_lookup_seeds ];
     let mut peers_by_method : Vec<Vec<SocketAddr>>;
     let mut peers : Vec<SocketAddr> = Vec::with_capacity(count);
 
