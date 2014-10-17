@@ -6,4 +6,7 @@ authors = ["Diogo Sousa <diogogsousa@gmail.com>"]
 
 [dependencies.openssl]
 git = "https://github.com/sfackler/rust-openssl.git"
-rev = "rust-0.12"
+
+[dependencies.http]
+git = "https://github.com/chris-morgan/rust-http"
+rev = "b929e4c16f9cff0d1c7334a2b39320be354fa0b0"

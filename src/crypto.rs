@@ -1,5 +1,7 @@
 extern crate openssl;
 
+use std::rand::OsRng;
+
 use self::openssl::crypto::hash::{SHA256,Hasher};
 
 pub fn sha256(data : &Vec<u8>) -> Vec<u8>
@@ -38,4 +40,13 @@ pub fn hash_to_hexstr(hash : &Vec<u8>) -> String
     }
 
     str
+}
+
+pub fn rng() -> OsRng
+{
+    let rng = OsRng::new();
+
+    assert!(rng.is_ok());
+
+    rng.unwrap()
 }

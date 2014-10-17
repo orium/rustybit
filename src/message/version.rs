@@ -1,5 +1,7 @@
 extern crate time;
 
+use std::rand::Rng;
+
 use std::fmt::Show;
 use std::fmt::Formatter;
 
@@ -23,9 +25,6 @@ impl Version
 {
     pub fn new(version : String, best_height : u32) -> Version
     {
-        // TODO: rnd should be a global variable. Is that possible in rust?
-        // let mut rng : ::std::rand::OsRng = ::std::rand::OsRng::new().unwrap();
-
         Version
         {
             proto_ver:   ::config::PROTOCOL_VERSION,
@@ -35,7 +34,7 @@ impl Version
             addr_recv:   NetAddr::new(None,::config::SERVICES,None),
             addr_send:   NetAddr::new(None,::config::SERVICES,None),
             best_height: best_height,
-            nounce:      0xababeface, // TODO rng.gen()
+            nounce:      ::crypto::rng().gen(),
             relay:       true
         }
     }
