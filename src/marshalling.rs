@@ -5,6 +5,17 @@ use std::io::net::ip::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use datatype::netaddr::NetAddr;
 use datatype::invvect::InvVect;
+use datatype::transaction::Transaction;
+use datatype::transaction::LockLocked;
+use datatype::transaction::LockUnlocked;
+use datatype::transaction::LockBlock;
+use datatype::transaction::LockTime;
+use datatype::transaction::TxIn;
+use datatype::transaction::TxOut;
+use datatype::transaction::TxLock;
+use datatype::transaction::OutPoint;
+use datatype::value::{Value,Satoshi};
+use datatype::script::Script;
 
 static VARSTR_MAX_LENGTH : uint = 256;
 static VARSTR_SAFE_CHARS : &'static str
@@ -199,6 +210,55 @@ impl Marshalling
         {
             self.write_uint32(entry.typ as u32);
             self.write_hash(&entry.hash);
+        }
+    }
+
+    pub fn write_script(&mut self, _s : &Script)
+    {
+        self.write_varint(0u64);
+        /* TODO write script */
+    }
+
+    pub fn write_value(&mut self, v : &Value)
+    {
+        match *v
+        {
+            Satoshi(v) => self.write_uint64(v)
+        }
+    }
+
+    pub fn write_transaction(&mut self, tx : &Transaction)
+    {
+        self.write_uint32(tx.get_version());
+
+        self.write_varint(tx.get_in_txs().len() as u64);
+
+        for in_tx in tx.get_in_txs().iter()
+        {
+            let prev_out : &OutPoint = in_tx.get_prev_out();
+
+            self.write_hash(prev_out.get_hash());
+            self.write_uint32(prev_out.get_index());
+            self.write_script(in_tx.get_script());
+            self.write_uint32(in_tx.get_sequence());
+        }
+
+        self.write_varint(tx.get_out_txs().len() as u64);
+
+        for out_tx in tx.get_out_txs().iter()
+        {
+            self.write_value(out_tx.get_value());
+
+            self.write_varint(0u64); /* XXX TODO */
+            /* TODO XXX write script */
+        }
+
+        match tx.get_lock()
+        {
+            LockLocked       => self.write_uint32(0),
+            LockUnlocked     => self.write_uint32(0xffffffff),
+            LockBlock(block) => self.write_uint32(block),
+            LockTime(tm)     => self.write_uint32(tm.sec as u32)
         }
     }
 
@@ -523,6 +583,65 @@ impl Unmarshalling
         }
 
         invvec
+    }
+
+    pub fn read_script(&mut self) -> Script
+    {
+        let script_len;
+
+        script_len = self.read_varint();
+        self.skip(script_len as uint); /* TODO read script */
+
+        Script::new()
+    }
+
+    pub fn read_value(&mut self) -> Value
+    {
+        Satoshi(self.read_uint64())
+    }
+
+    pub fn read_transaction(&mut self) -> Transaction
+    {
+        let version : u32;
+        let mut txs_in : Vec<TxIn> = Vec::new();
+        let mut txs_out : Vec<TxOut> = Vec::new();
+        let lock : TxLock;
+
+        version = self.read_uint32();
+
+        for _ in range(0,self.read_varint())
+        {
+            let prev_out : OutPoint;
+            let sig_script : Script;
+            let sequence : u32;
+
+            prev_out = OutPoint::new(self.read_hash(),
+                                     self.read_uint32());
+            sig_script = self.read_script();
+            sequence = self.read_uint32();
+
+            txs_in.push(TxIn::new(prev_out,sig_script,sequence));
+        }
+
+        // out
+        for _ in range(0,self.read_varint())
+        {
+            let value : Value;
+            let script_len : u64;
+            let script : Script;
+
+            value = self.read_value();
+
+            script_len = self.read_varint(); /* XXX read script */
+            self.skip(script_len as uint); /* XXX read script */
+            script = Script::new(); /* XXX read script */
+
+            txs_out.push(TxOut::new(value,script));
+        }
+
+        lock = TxLock::from_u32(self.read_uint32());
+
+        Transaction::new(version,txs_in,txs_out,lock)
     }
 
     pub fn consumed(&self) -> uint
