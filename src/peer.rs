@@ -8,20 +8,20 @@ use std::time::duration::Duration;
 
 use message::Message;
 use message::MsgVersion;
-use message::MsgVersionAck;
+use message::MsgVerAck;
 use message::MsgPing;
 use message::MsgPong;
-use message::MsgAddresses;
+use message::MsgAddr;
 use message::MsgInv;
 use message::MsgGetData;
 use message::MsgReject;
 use message::MsgTx;
 
 use message::version::Version;
-use message::versionack::VersionAck;
+use message::verack::VerAck;
 use message::ping::Ping;
 use message::pong::Pong;
-use message::addresses::Addresses;
+use message::addr::Addr;
 use message::inv::Inv;
 use message::getdata::GetData;
 use message::reject::Reject;
@@ -155,7 +155,7 @@ impl Peer
 
     fn send_versionack(&mut self) -> Result<(),PeerError>
     {
-        let verack = VersionAck::new();
+        let verack = VerAck::new();
 
         println!("<<< {}  {:30} command: {:9}",
                  time::now().rfc822z(),
@@ -246,7 +246,7 @@ impl Peer
         Ok(())
     }
 
-    fn handle_versionack(&mut self, verack : VersionAck) -> Result<(),PeerError>
+    fn handle_versionack(&mut self, verack : VerAck) -> Result<(),PeerError>
     {
         println!("{:4}",verack);
 
@@ -283,7 +283,7 @@ impl Peer
         Ok(())
     }
 
-    fn handle_addresses(&mut self, addrs : Addresses) -> Result<(),PeerError>
+    fn handle_addresses(&mut self, addrs : Addr) -> Result<(),PeerError>
     {
         println!("{:4}",addrs);
 
@@ -430,10 +430,10 @@ impl Peer
             result = match maybemsg.unwrap()
             {
                 MsgVersion(version)   => self.handle_version(version),
-                MsgVersionAck(verack) => self.handle_versionack(verack),
+                MsgVerAck(verack) => self.handle_versionack(verack),
                 MsgPing(ping)         => self.handle_ping(ping),
                 MsgPong(pong)         => self.handle_pong(pong),
-                MsgAddresses(addrs)   => self.handle_addresses(addrs),
+                MsgAddr(addrs)   => self.handle_addresses(addrs),
                 MsgInv(inv)           => self.handle_inv(inv),
                 MsgGetData(getdata)   => self.handle_getdata(getdata),
                 MsgReject(reject)     => self.handle_reject(reject),

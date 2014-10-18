@@ -4,20 +4,20 @@ use std::io::TcpStream;
 
 use message::Message;
 use message::MsgVersion;
-use message::MsgVersionAck;
+use message::MsgVerAck;
 use message::MsgPing;
 use message::MsgPong;
-use message::MsgAddresses;
+use message::MsgAddr;
 use message::MsgInv;
 use message::MsgGetData;
 use message::MsgReject;
 use message::MsgTx;
 
 use message::version::Version;
-use message::versionack::VersionAck;
+use message::verack::VerAck;
 use message::ping::Ping;
 use message::pong::Pong;
-use message::addresses::Addresses;
+use message::addr::Addr;
 use message::inv::Inv;
 use message::getdata::GetData;
 use message::reject::Reject;
@@ -176,11 +176,11 @@ impl MsgBuffer
             },
             "verack" =>
             {
-                let verack : VersionAck;
+                let verack : VerAck;
 
-                verack = VersionAck::unserialize(&self.buf);
+                verack = VerAck::unserialize(&self.buf);
 
-                Ok(MsgVersionAck(verack))
+                Ok(MsgVerAck(verack))
             },
             "ping" =>
             {
@@ -200,11 +200,11 @@ impl MsgBuffer
             },
             "addr" =>
             {
-                let addr : Addresses;
+                let addr : Addr;
 
-                addr = Addresses::unserialize(&self.buf);
+                addr = Addr::unserialize(&self.buf);
 
-                Ok(MsgAddresses(addr))
+                Ok(MsgAddr(addr))
             },
             "inv" =>
             {

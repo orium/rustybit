@@ -3,13 +3,13 @@ use std::fmt::Formatter;
 
 use message::header::Header;
 
-pub struct VersionAck;
+pub struct VerAck;
 
-impl VersionAck
+impl VerAck
 {
-    pub fn new() -> VersionAck
+    pub fn new() -> VerAck
     {
-        VersionAck
+        VerAck
     }
 
     pub fn serialize(&self) -> Vec<u8>
@@ -24,19 +24,19 @@ impl VersionAck
         header.serialize()
     }
 
-    pub fn unserialize(_data : &Vec<u8>) -> VersionAck
+    pub fn unserialize(_data : &Vec<u8>) -> VerAck
     {
-        VersionAck::new()
+        VerAck::new()
     }
 }
 
-impl Show for VersionAck
+impl Show for VerAck
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
         let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
         let space = String::from_str(" ").repeat(width);
 
-        write!(f, "{}VersionAck", space)
+        write!(f, "{}VerAck", space)
     }
 }

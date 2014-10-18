@@ -5,17 +5,17 @@ use message::header::Header;
 
 use datatype::netaddr::NetAddr;
 
-pub struct Addresses
+pub struct Addr
 {
     addresses : Vec<NetAddr>
 }
 
 #[allow(dead_code)]
-impl Addresses
+impl Addr
 {
-    pub fn new() -> Addresses
+    pub fn new() -> Addr
     {
-        Addresses
+        Addr
         {
             addresses: Vec::new()
         }
@@ -53,10 +53,10 @@ impl Addresses
         header.serialize() + msg.get()
     }
 
-    pub fn unserialize(data : &Vec<u8>) -> Addresses
+    pub fn unserialize(data : &Vec<u8>) -> Addr
     {
         let mut unmarshalling = ::marshalling::Unmarshalling::new(data);
-        let mut addresses : Addresses = Addresses::new();
+        let mut addresses : Addr = Addr::new();
         let count : u64;
 
         count = unmarshalling.read_varint();
@@ -74,14 +74,14 @@ impl Addresses
     }
 }
 
-impl Show for Addresses
+impl Show for Addr
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
         let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
         let space = String::from_str(" ").repeat(width);
 
-        try!(write!(f,"{}Addresses:\n", space));
+        try!(write!(f,"{}Addr:\n", space));
 
         for i in range(0,self.addresses.len())
         {
