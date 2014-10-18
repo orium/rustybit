@@ -16,7 +16,7 @@ impl Show for Value
     {
         match *self
         {
-            Satoshi(v) => write!(f,"{}.{:05}m฿",v/100_000,v%100_000)
+            Satoshi(v) => write!(f,"{}.{:05} m฿",v/100_000,v%100_000)
         }
     }
 }

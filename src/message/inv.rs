@@ -72,8 +72,8 @@ impl Show for Inv
 
         try!(write!(f,"{}Inv:\n", space));
 
-        // TODO this should be "{:4+space}"
-        try!(write!(f,"{:8}", self.vect));
+        // TODO this should be "{:2+space}"
+        try!(write!(f,"{:6}", self.vect));
 
         Ok(())
     }

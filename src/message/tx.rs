@@ -48,7 +48,7 @@ impl Tx
         {
             let prev_out : &OutPoint = in_tx.get_prev_out();
 
-            msg.write(prev_out.get_hash().as_slice());
+            msg.write_hash(prev_out.get_hash());
             msg.write_uint32(prev_out.get_index());
 
             msg.write_varint(0u64); /* XXX TODO */
@@ -97,13 +97,13 @@ impl Tx
 
         for _ in range(0,unmarshalling.read_varint())
         {
-            let mut prev_out_hash : Vec<u8> = [0u8, ..32].to_vec();
+            let mut prev_out_hash : Vec<u8>;
             let prev_out : OutPoint;
             let script_len : u64;
             let sig_script : Script;
             let sequence : u32;
 
-            unmarshalling.read(prev_out_hash.as_mut_slice());
+            prev_out_hash = unmarshalling.read_hash();
 
             prev_out = OutPoint::new(prev_out_hash,
                                      unmarshalling.read_uint32());
@@ -151,7 +151,7 @@ impl Show for Tx
 
         try!(write!(f,"{}Transaction:\n", space));
 
-        // TODO this should be "{:4+space}"
-        write!(f,"{:8}", self.tx)
+        // TODO this should be "{:2+space}"
+        write!(f,"{:6}", self.tx)
     }
 }

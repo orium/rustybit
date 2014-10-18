@@ -42,9 +42,9 @@ impl Show for OutPoint
         let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
         let space = String::from_str(" ").repeat(width);
 
-        try!(write!(f,"{}Hash : {}\n",space,::crypto::hash_to_hexstr(&self.hash)));
-        try!(write!(f,"{}Index: {}",space,self.index));
-
+        try!(write!(f,"{}{} idx: {}",space,
+                    ::crypto::hash_to_hexstr(&self.hash),
+                    self.index));
         Ok(())
     }
 }
@@ -137,8 +137,7 @@ impl Show for TxIn
         let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
         let space = String::from_str(" ").repeat(width);
 
-        try!(write!(f,"{}PrevOut\n",space));
-        try!(write!(f,"{}{}\n",space,self.prev_out));
+        try!(write!(f,"{}PrevOut  : {}\n",space,self.prev_out));
         try!(write!(f,"{}SigScript: {}\n",space,self.sig_script));
         try!(write!(f,"{}Sequence : {}",space,self.sequence));
 
@@ -198,6 +197,11 @@ impl Transaction
         }
     }
 
+    pub fn get_hash(&self) -> Vec<u8>
+    {
+        [0u8, ..32].to_vec() // TODO
+    }
+
     pub fn get_version(&self) -> u32
     {
         self.version
@@ -226,23 +230,27 @@ impl Show for Transaction
         let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
         let space = String::from_str(" ").repeat(width);
 
-        try!(write!(f,"{}Version:  {}\n",space,self.version));
+        try!(write!(f,"{}Hash    : {}\n",space,
+                    ::crypto::hash_to_hexstr(&self.get_hash())));
+        try!(write!(f,"{}Version : {}\n",space,self.version));
+        try!(write!(f,"{}LockTime: {}\n",space,self.lock));
 
-        try!(write!(f,"{}TxIn\n",space));
+        try!(write!(f,"{}TxsIn\n",space));
 
         for tx_in in self.txs_in.iter()
         {
-            try!(write!(f,"{}{:4}\n",space,tx_in));
+            // TODO this should be "{:2+space}"
+            try!(write!(f,"{:8}\n",tx_in));
         }
 
-        try!(write!(f,"{}TxOut\n",space));
+        try!(write!(f,"{}TxsOut\n",space));
 
-        for tx_out in self.txs_out.iter()
+        for i in range(0,self.txs_out.len())
         {
-            try!(write!(f,"{}{:4}\n",space,tx_out));
+            // TODO this should be "{:2+space}"
+            try!(write!(f,"{:8}{}",self.txs_out[i],
+                        if i == self.txs_out.len()-1 { "" } else { "\n" }));
         }
-
-        try!(write!(f,"{}LockTime: {}",space,self.lock));
 
         Ok(())
     }

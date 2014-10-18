@@ -128,6 +128,7 @@ fn main()
     /* For testing */
     peers.push(SocketAddr { ip: std::io::net::ip::Ipv4Addr(127,0,0,1),   port: 8333 });
     peers.push(SocketAddr { ip: std::io::net::ip::Ipv4Addr(192,168,1,2), port: 8333 });
+    peers.reverse();
 
     for peer in peers.iter()
     {
