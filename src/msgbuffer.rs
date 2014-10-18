@@ -11,6 +11,7 @@ use message::MsgAddresses;
 use message::MsgInv;
 use message::MsgGetData;
 use message::MsgReject;
+use message::MsgTx;
 
 use message::version::Version;
 use message::versionack::VersionAck;
@@ -20,6 +21,7 @@ use message::addresses::Addresses;
 use message::inv::Inv;
 use message::getdata::GetData;
 use message::reject::Reject;
+use message::tx::Tx;
 
 use message::header::Header;
 use message::header::HEADER_SIZE;
@@ -227,6 +229,14 @@ impl MsgBuffer
                 reject = Reject::unserialize(&self.buf);
 
                 Ok(MsgReject(reject))
+            },
+            "tx" =>
+            {
+                let tx : Tx;
+
+                tx = Tx::unserialize(&self.buf);
+
+                Ok(MsgTx(tx))
             },
             _ => Err(ReadMsgUnknownCommand)
         };

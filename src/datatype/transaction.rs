@@ -12,6 +12,7 @@ pub struct OutPoint
     index : u32      /* Index of the specific output in the transaction */
 }
 
+#[allow(dead_code)]
 impl OutPoint
 {
     pub fn new(hash : Vec<u8>, index : u32) -> OutPoint
@@ -21,6 +22,16 @@ impl OutPoint
             hash:  hash,
             index: index
         }
+    }
+
+    pub fn get_hash(&self) -> &Vec<u8>
+    {
+        &self.hash
+    }
+
+    pub fn get_index(&self) -> u32
+    {
+        self.index
     }
 }
 
@@ -44,6 +55,7 @@ pub struct TxOut
     script : Script
 }
 
+#[allow(dead_code)]
 impl TxOut
 {
     pub fn new(value : Value, script : Script) -> TxOut
@@ -53,6 +65,16 @@ impl TxOut
             value:  value,
             script: script
         }
+    }
+
+    pub fn get_value(&self) -> &Value
+    {
+        &self.value
+    }
+
+    pub fn get_script(&self) -> &Script
+    {
+        &self.script
     }
 }
 
@@ -74,9 +96,10 @@ pub struct TxIn
 {
     prev_out   : OutPoint,
     sig_script : Script,
-    sequence   : u32       /* http://bitcoin.stackexchange.com/q/2025/323 */
+    sequence   : u32       /* See http://bitcoin.stackexchange.com/q/2025/323 */
 }
 
+#[allow(dead_code)]
 impl TxIn
 {
     pub fn new(prev_out   : OutPoint,
@@ -85,10 +108,25 @@ impl TxIn
     {
         TxIn
         {
-            prev_out   : prev_out,
-            sig_script : sig_script,
-            sequence   : sequence
+            prev_out:   prev_out,
+            sig_script: sig_script,
+            sequence:   sequence
         }
+    }
+
+    pub fn get_prev_out(&self) -> &OutPoint
+    {
+        &self.prev_out
+    }
+
+    pub fn get_script(&self) -> &Script
+    {
+        &self.sig_script
+    }
+
+    pub fn get_sequence(&self) -> u32
+    {
+        self.sequence
     }
 }
 
@@ -99,7 +137,8 @@ impl Show for TxIn
         let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
         let space = String::from_str(" ").repeat(width);
 
-        try!(write!(f,"{}PrevOut  : {}\n",space,self.prev_out));
+        try!(write!(f,"{}PrevOut\n",space));
+        try!(write!(f,"{}{}\n",space,self.prev_out));
         try!(write!(f,"{}SigScript: {}\n",space,self.sig_script));
         try!(write!(f,"{}Sequence : {}",space,self.sequence));
 
@@ -108,38 +147,79 @@ impl Show for TxIn
 }
 
 #[deriving(Show)]
-pub enum TemporalLock
+pub enum TxLock
 {
+    LockLocked,               /* Always locked */
+    LockUnlocked,             /* Always unlocked */
     LockBlock(u32),
-    LockTime(time::Timespec),
+    LockTime(time::Timespec)
 }
 
-pub struct Tx
+impl TxLock
 {
-    version   : u32,
-    txs_in    : Vec<TxIn>,
-    txs_out   : Vec<TxOut>,
-    lock_time : TemporalLock
-}
-
-impl Tx
-{
-    pub fn new(version   : u32,
-               txs_in    : Vec<TxIn>,
-               txs_out   : Vec<TxOut>,
-               lock_time : TemporalLock) -> Tx
+    pub fn from_u32(v : u32) -> TxLock
     {
-        Tx
+        match v
         {
-            version   : version,
-            txs_in    : txs_in,
-            txs_out   : txs_out,
-            lock_time : lock_time
+            0                        => LockLocked,
+            1         ... 500000000  => LockBlock(v),
+            500000001 ... 0xfffffffe => LockTime(time::Timespec { sec: v as i64,
+                                                                  nsec: 0}),
+            0xffffffff               => LockUnlocked,
+            _                        => unreachable!()
         }
     }
 }
 
-impl Show for Tx
+/* TODO impl Show for TemporalLock */
+
+pub struct Transaction
+{
+    version : u32,
+    txs_in  : Vec<TxIn>,
+    txs_out : Vec<TxOut>,
+    lock    : TxLock
+}
+
+#[allow(dead_code)]
+impl Transaction
+{
+    pub fn new(version : u32,
+               txs_in  : Vec<TxIn>,
+               txs_out : Vec<TxOut>,
+               lock    : TxLock) -> Transaction
+    {
+        Transaction
+        {
+            version: version,
+            txs_in:  txs_in,
+            txs_out: txs_out,
+            lock:    lock
+        }
+    }
+
+    pub fn get_version(&self) -> u32
+    {
+        self.version
+    }
+
+    pub fn get_in_txs(&self) -> &Vec<TxIn>
+    {
+        &self.txs_in
+    }
+
+    pub fn get_out_txs(&self) -> &Vec<TxOut>
+    {
+        &self.txs_out
+    }
+
+    pub fn get_lock(&self) -> TxLock
+    {
+        self.lock
+    }
+}
+
+impl Show for Transaction
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
     {
@@ -162,7 +242,7 @@ impl Show for Tx
             try!(write!(f,"{}{:4}\n",space,tx_out));
         }
 
-        try!(write!(f,"{}LockTime: {}",space,self.lock_time));
+        try!(write!(f,"{}LockTime: {}",space,self.lock));
 
         Ok(())
     }

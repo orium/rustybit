@@ -4,6 +4,7 @@ use std::fmt::Formatter;
 /* This makes it safe to change to subunits of satoshi in the future without
  * creating nasty bugs, because type system.
  */
+#[allow(dead_code)]
 pub enum Value
 {
     Satoshi(u64)

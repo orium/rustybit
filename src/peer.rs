@@ -15,6 +15,7 @@ use message::MsgAddresses;
 use message::MsgInv;
 use message::MsgGetData;
 use message::MsgReject;
+use message::MsgTx;
 
 use message::version::Version;
 use message::versionack::VersionAck;
@@ -24,6 +25,7 @@ use message::addresses::Addresses;
 use message::inv::Inv;
 use message::getdata::GetData;
 use message::reject::Reject;
+use message::tx::Tx;
 
 use datatype::invvect::InvVect;
 
@@ -311,6 +313,13 @@ impl Peer
         Ok(())
     }
 
+    fn handle_tx(&mut self, tx : Tx) -> Result<(),PeerError>
+    {
+        println!("{:4}",tx);
+
+        Ok(())
+    }
+
     fn periodic_sendping(&mut self) -> Result<(),PeerError>
     {
         if self.last_ping.is_none()
@@ -428,6 +437,7 @@ impl Peer
                 MsgInv(inv)           => self.handle_inv(inv),
                 MsgGetData(getdata)   => self.handle_getdata(getdata),
                 MsgReject(reject)     => self.handle_reject(reject),
+                MsgTx(tx)             => self.handle_tx(tx),
             };
 
             match result
@@ -500,7 +510,7 @@ impl Periodic
  * inv              v  |
  * getdata             |   v
  * reject           v  |
- * tx                  |
+ * tx               v  |
  * block               |
  * notfound            |
  * getblocks           |
