@@ -3,6 +3,9 @@ use std::fmt::Formatter;
 
 use std::clone::Clone;
 
+use datatype::hash::Hash;
+
+#[deriving(Clone)]
 pub enum InvEntryType
 {
     Error,
@@ -10,10 +13,11 @@ pub enum InvEntryType
     MsgBlock
 }
 
+#[deriving(Clone)]
 pub struct InvEntry
 {
     pub typ  : InvEntryType,
-    pub hash : Vec<u8>
+    pub hash : Hash
 }
 
 impl Show for InvEntry
@@ -27,25 +31,11 @@ impl Show for InvEntry
             MsgBlock => try!(write!(f, "BLOCK "))
         }
 
-        try!(write!(f, "{}", ::crypto::hash_to_hexstr(&self.hash)));
-
-        Ok(())
+        write!(f,"{}",self.hash)
     }
 }
 
-impl Clone for InvEntry
-{
-    fn clone(&self) -> InvEntry
-    {
-        InvEntry
-        {
-            typ : self.typ,
-            hash: self.hash.clone()
-        }
-    }
-}
-
-
+#[deriving(Clone)]
 pub struct InvVect
 {
     entries : Vec<InvEntry>
@@ -91,16 +81,5 @@ impl Show for InvVect
         }
 
         Ok(())
-    }
-}
-
-impl Clone for InvVect
-{
-    fn clone(&self) -> InvVect
-    {
-        InvVect
-        {
-            entries: self.entries.clone()
-        }
     }
 }

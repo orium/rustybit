@@ -16,6 +16,7 @@ use datatype::transaction::TxLock;
 use datatype::transaction::OutPoint;
 use datatype::value::{Value,Satoshi};
 use datatype::script::Script;
+use datatype::hash::Hash;
 
 static VARSTR_MAX_LENGTH : uint = 256;
 static VARSTR_SAFE_CHARS : &'static str
@@ -192,10 +193,8 @@ impl Marshalling
         };
     }
 
-    pub fn write_hash(&mut self, hash : &Vec<u8>)
+    pub fn write_hash(&mut self, hash : &Hash)
     {
-        assert!(hash.len() == 32);
-
         for i in range(0u,32).rev()
         {
             self.buf.push(hash[i]);
@@ -249,7 +248,7 @@ impl Marshalling
         {
             self.write_value(out_tx.get_value());
 
-            self.write_varint(0u64); /* XXX TODO */
+            self.write_varint(0u64); /* TODO XXX write script */
             /* TODO XXX write script */
         }
 
@@ -539,21 +538,19 @@ impl Unmarshalling
         NetAddr::new(time,services,socketaddr)
     }
 
-    pub fn read_hash(&mut self) -> Vec<u8>
+    pub fn read_hash(&mut self) -> Hash
     {
-        let mut hash : Vec<u8> = Vec::new();
+        let mut hash : [u8, ..32] = [0, ..32];
 
         assert!(self.pos+32 <= self.buf.len());
 
-        for _ in range(0u,32)
+        for i in range(0u,32).rev()
         {
-            hash.push(self.buf[self.pos]);
+            hash[i] = self.buf[self.pos];
             self.pos += 1;
         }
 
-        hash.reverse();
-
-        hash
+        Hash::new(hash)
     }
 
     pub fn read_invvect(&mut self) -> InvVect

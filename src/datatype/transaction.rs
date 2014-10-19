@@ -5,17 +5,18 @@ use std::fmt::Formatter;
 
 use datatype::value::Value;
 use datatype::script::Script;
+use datatype::hash::Hash;
 
 pub struct OutPoint
 {
-    hash  : Vec<u8>,
+    hash  : Hash,
     index : u32      /* Index of the specific output in the transaction */
 }
 
 #[allow(dead_code)]
 impl OutPoint
 {
-    pub fn new(hash : Vec<u8>, index : u32) -> OutPoint
+    pub fn new(hash : Hash, index : u32) -> OutPoint
     {
         OutPoint
         {
@@ -24,7 +25,7 @@ impl OutPoint
         }
     }
 
-    pub fn get_hash(&self) -> &Vec<u8>
+    pub fn get_hash(&self) -> &Hash
     {
         &self.hash
     }
@@ -42,10 +43,7 @@ impl Show for OutPoint
         let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
         let space = String::from_str(" ").repeat(width);
 
-        try!(write!(f,"{}{} idx: {}",space,
-                    ::crypto::hash_to_hexstr(&self.hash),
-                    self.index));
-        Ok(())
+        write!(f,"{}{} idx: {}",space,self.hash,self.index)
     }
 }
 
@@ -230,8 +228,8 @@ impl Show for Transaction
         let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
         let space = String::from_str(" ").repeat(width);
 
-        try!(write!(f,"{}Hash    : {}\n",space,
-                    ::crypto::hash_to_hexstr(&self.get_hash())));
+
+        try!(write!(f,"{}Hash    : {}\n",space,self.get_hash()));
         try!(write!(f,"{}Version : {}\n",space,self.version));
         try!(write!(f,"{}LockTime: {}\n",space,self.lock));
 
