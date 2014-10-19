@@ -133,8 +133,6 @@ impl Marshalling
     {
         let bytes : &[u8] = str.as_bytes();
 
-        println!(".{}.{}.",Unmarshalling::sanitize_string(str),*str);
-
         assert!(Unmarshalling::sanitize_string(str) == *str);
 
         self.write_varint(bytes.len() as u64);
