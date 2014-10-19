@@ -430,10 +430,10 @@ impl Peer
             result = match maybemsg.unwrap()
             {
                 MsgVersion(version)   => self.handle_version(version),
-                MsgVerAck(verack) => self.handle_versionack(verack),
+                MsgVerAck(verack)     => self.handle_versionack(verack),
                 MsgPing(ping)         => self.handle_ping(ping),
                 MsgPong(pong)         => self.handle_pong(pong),
-                MsgAddr(addrs)   => self.handle_addresses(addrs),
+                MsgAddr(addrs)        => self.handle_addresses(addrs),
                 MsgInv(inv)           => self.handle_inv(inv),
                 MsgGetData(getdata)   => self.handle_getdata(getdata),
                 MsgReject(reject)     => self.handle_reject(reject),
