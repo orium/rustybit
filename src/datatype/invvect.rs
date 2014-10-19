@@ -67,6 +67,14 @@ impl InvVect
     }
 }
 
+impl Index<uint, InvEntry> for InvVect
+{
+    fn index(&self, index: &uint) -> &InvEntry
+    {
+        &self.entries[*index]
+    }
+}
+
 impl Show for InvVect
 {
     fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
