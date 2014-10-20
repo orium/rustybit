@@ -195,9 +195,9 @@ impl Transaction
         }
     }
 
-    pub fn get_hash(&self) -> Vec<u8>
+    pub fn get_hash(&self) -> Hash
     {
-        [0u8, ..32].to_vec() // TODO
+        Hash::new([0u8, ..32]) // TODO
     }
 
     pub fn get_version(&self) -> u32
