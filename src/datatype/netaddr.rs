@@ -3,8 +3,11 @@ extern crate time;
 use std::fmt::Show;
 use std::fmt::Formatter;
 
+use std::clone::Clone;
+
 use std::io::net::ip::SocketAddr;
 
+#[deriving(Clone)]
 pub struct NetAddr
 {
     pub time     : Option<time::Timespec>,

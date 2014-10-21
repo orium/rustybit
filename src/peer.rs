@@ -31,6 +31,9 @@ use datatype::invvect::InvVect;
 
 use msgbuffer::MsgBuffer;
 
+use addresspool::AddressPoolChannel;
+use addresspool::AddrPoolAddAddresses;
+
 macro_rules! some_ref_or(
     ($e:expr, $err:expr) => (match $e { Some(ref mut e) => e, None => return $err }))
 
@@ -79,10 +82,11 @@ static TIMEOUT_S : uint = 10*60;
 
 pub struct Peer
 {
-    addr      : SocketAddr,
-    socket    : Option<TcpStream>,
-    version   : Option<Version>,
-    last_ping : Option<Timespec>
+    addr              : SocketAddr,
+    socket            : Option<TcpStream>,
+    version           : Option<Version>,
+    last_ping         : Option<Timespec>,
+    addr_pool_channel : AddressPoolChannel
 }
 
 static TIMEOUT_CONNECT_MS : uint = 10000;
@@ -90,14 +94,16 @@ static TIMEOUT_WRITE_MS : uint = 5*60*1000;
 
 impl Peer
 {
-    pub fn new(addr : SocketAddr) -> Peer
+    pub fn new(addr : SocketAddr,
+               addr_pool_channel : AddressPoolChannel) -> Peer
     {
         Peer
         {
-            addr:      addr,
-            socket:    None,
-            version:   None,
-            last_ping: None
+            addr:              addr,
+            socket:            None,
+            version:           None,
+            last_ping:         None,
+            addr_pool_channel: addr_pool_channel
         }
     }
 
@@ -285,7 +291,11 @@ impl Peer
 
     fn handle_addresses(&mut self, addrs : Addr) -> Result<(),PeerError>
     {
+        let (ref sender, _) = self.addr_pool_channel;
+
         println!("{:4}",addrs);
+
+        sender.send(AddrPoolAddAddresses(addrs.get_addresses().clone()));
 
         Ok(())
     }
@@ -511,12 +521,12 @@ impl Periodic
  * getdata             |   v
  * reject           v  |
  * tx               v  |
+ * getaddr             |
  * block               |
  * notfound            |
  * getblocks           |
  * getheaders          |
  * headers             |
- * getaddr             |
  *
  *
  * Later:
