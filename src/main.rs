@@ -10,7 +10,7 @@ use std::time::duration::Duration;
 use getopts::optflag;
 use peerdiscovery::discover_peers;
 
-use sync::comm::channel;
+use sync::comm::sync_channel;
 
 use addrmng::AddrManagerChannel;
 use addrmng::AddrManager;
@@ -109,7 +109,7 @@ fn spawn_thread_run_peer(address      : SocketAddr,
     });
 }
 
-fn spawn_thread_run_address_manager(sender   : Sender<AddrManagerReply>,
+fn spawn_thread_run_address_manager(sender   : SyncSender<AddrManagerReply>,
                                     receiver : Receiver<AddrManagerRequest>)
 {
     spawn(proc() {
@@ -124,8 +124,8 @@ fn spawn_thread_run_address_manager(sender   : Sender<AddrManagerReply>,
 fn run_peers()
 {
     let mut addrs : Vec<SocketAddr>;
-    let (send_our, recv_addrmng) = channel();
-    let (send_addrmng, _recv_our) = channel();
+    let (send_our, recv_addrmng) = sync_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
+    let (send_addrmng, _recv_our) = sync_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
 
     addrs = discover_peers(config::INITIAL_DISCOVERY_PEERS);
 
@@ -138,8 +138,8 @@ fn run_peers()
 
     for addrs in addrs.iter()
     {
-        let (send_c, recv_s) = channel();
-        let (send_s, recv_c) = channel();
+        let (send_c, recv_s) = sync_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
+        let (send_s, recv_c) = sync_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
 
         send_our.send(AddrMngAddPeerChannel(send_s,recv_s));
 

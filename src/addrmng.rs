@@ -4,26 +4,28 @@ use std::comm::Handle;
 use std::collections::HashSet;
 
 use self::sync::comm::Receiver;
-use self::sync::comm::Sender;
+use self::sync::comm::SyncSender;
 use self::sync::comm::Select;
 use self::sync::comm::Empty;
 use self::sync::comm::Disconnected;
 
 use datatype::netaddr::NetAddr;
 
+pub static ADDRMNG_CHANNEL_BUF_CAP : uint = 8;
+
 static ANNOUNCE_ADDRS_MIN : uint = 20;
 static ANNOUNCE_ADDRS_MAX : uint = 100;
 
 pub type AddrManagerChannel
-    = (Sender<AddrManagerRequest>, Receiver<AddrManagerReply>);
+    = (SyncSender<AddrManagerRequest>, Receiver<AddrManagerReply>);
 
 type PeerChannel
-    = (Sender<AddrManagerReply>, Receiver<AddrManagerRequest>);
+    = (SyncSender<AddrManagerReply>, Receiver<AddrManagerRequest>);
 
 pub enum AddrManagerRequest
 {
     AddrMngAddAddresses(Vec<NetAddr>),
-    AddrMngAddPeerChannel(Sender<AddrManagerReply>,
+    AddrMngAddPeerChannel(SyncSender<AddrManagerReply>,
                           Receiver<AddrManagerRequest>),
     AddrMngGetAddresses
 }
