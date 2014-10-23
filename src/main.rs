@@ -12,11 +12,11 @@ use peerdiscovery::discover_peers;
 
 use sync::comm::channel;
 
-use addresspool::AddressPoolChannel;
-use addresspool::AddressPoolManager;
-use addresspool::AddressPoolRequest;
-use addresspool::AddressPoolReply;
-use addresspool::AddrPoolAddPeerChannel;
+use addrmng::AddrManagerChannel;
+use addrmng::AddrManager;
+use addrmng::AddrManagerRequest;
+use addrmng::AddrManagerReply;
+use addrmng::AddrMngAddPeerChannel;
 
 mod config;
 mod datatype;
@@ -26,7 +26,7 @@ mod msgbuffer;
 mod message;
 mod peer;
 mod peerdiscovery;
-mod addresspool;
+mod addrmng;
 
 struct Options
 {
@@ -83,10 +83,10 @@ fn parse_options() -> Option<Options>
                    version: matches.opt_present("v") })
 }
 
-fn run_peer(address           : SocketAddr,
-            addr_pool_channel : AddressPoolChannel) -> Result<(),peer::PeerError>
+fn run_peer(address      : SocketAddr,
+            addr_channel : AddrManagerChannel) -> Result<(),peer::PeerError>
 {
-    let mut peer : peer::Peer = peer::Peer::new(address,addr_pool_channel);
+    let mut peer : peer::Peer = peer::Peer::new(address,addr_channel);
 
     try!(peer.connect());
     try!(peer.send_version());
@@ -94,11 +94,11 @@ fn run_peer(address           : SocketAddr,
     peer.read_loop()
 }
 
-fn spawn_thread_run_peer(address           : SocketAddr,
-                         addr_pool_channel : AddressPoolChannel)
+fn spawn_thread_run_peer(address      : SocketAddr,
+                         addr_channel : AddrManagerChannel)
 {
     spawn(proc() {
-        match run_peer(address,addr_pool_channel)
+        match run_peer(address,addr_channel)
         {
             Err(err) =>
             {
@@ -109,23 +109,23 @@ fn spawn_thread_run_peer(address           : SocketAddr,
     });
 }
 
-fn spawn_thread_run_address_pool_manager(sender   : Sender<AddressPoolReply>,
-                                         receiver : Receiver<AddressPoolRequest>)
+fn spawn_thread_run_address_manager(sender   : Sender<AddrManagerReply>,
+                                    receiver : Receiver<AddrManagerRequest>)
 {
     spawn(proc() {
-        let mut addr_pool_mng : AddressPoolManager;
+        let mut addr_mng : AddrManager;
 
-        addr_pool_mng = AddressPoolManager::new((sender,receiver));
+        addr_mng = AddrManager::new((sender,receiver));
 
-        addr_pool_mng.read_loop();
+        addr_mng.read_loop();
     });
 }
 
 fn run_peers()
 {
     let mut addrs : Vec<SocketAddr>;
-    let (send_our, recv_poolmsg) = channel();
-    let (send_poolmsg, _recv_our) = channel();
+    let (send_our, recv_addrmng) = channel();
+    let (send_addrmng, _recv_our) = channel();
 
     addrs = discover_peers(config::INITIAL_DISCOVERY_PEERS);
 
@@ -134,14 +134,14 @@ fn run_peers()
     addrs.push(SocketAddr { ip: std::io::net::ip::Ipv4Addr(192,168,1,2), port: 8333 });
     addrs.reverse();
 
-    spawn_thread_run_address_pool_manager(send_poolmsg,recv_poolmsg);
+    spawn_thread_run_address_manager(send_addrmng,recv_addrmng);
 
     for addrs in addrs.iter()
     {
         let (send_c, recv_s) = channel();
         let (send_s, recv_c) = channel();
 
-        send_our.send(AddrPoolAddPeerChannel(send_s,recv_s));
+        send_our.send(AddrMngAddPeerChannel(send_s,recv_s));
 
         spawn_thread_run_peer(*addrs,(send_c,recv_c));
     }

@@ -44,6 +44,11 @@ impl Version
         self.proto_ver
     }
 
+    pub fn get_addr_send(&self) -> &NetAddr
+    {
+        &self.addr_send
+    }
+
     // TODO: create a trait for serialization (serialize::Encodable?)
     pub fn serialize(&self) -> Vec<u8>
     {

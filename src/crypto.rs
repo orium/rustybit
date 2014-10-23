@@ -1,5 +1,6 @@
 extern crate openssl;
 
+use std::rand::Rng;
 use std::rand::OsRng;
 
 use self::openssl::crypto::hash::{SHA256,Hasher};
@@ -49,4 +50,11 @@ pub fn rng() -> OsRng
     assert!(rng.is_ok());
 
     rng.unwrap()
+}
+
+/* Return a random uint between low (inclusive) and max (inclusive).
+ */
+pub fn rand_interval(low : uint, max : uint) -> uint
+{
+    low+(rng().gen::<uint>()%(max-low+1))
 }

@@ -28,11 +28,16 @@ use message::reject::Reject;
 use message::tx::Tx;
 
 use datatype::invvect::InvVect;
+use datatype::netaddr::NetAddr;
 
 use msgbuffer::MsgBuffer;
 
-use addresspool::AddressPoolChannel;
-use addresspool::AddrPoolAddAddresses;
+use addrmng::AddrManagerChannel;
+use addrmng::AddrManagerRequest;
+use addrmng::AddrManagerReply;
+use addrmng::AddrMngAddAddresses;
+use addrmng::AddrMngGetAddresses;
+use addrmng::AddrMngAddresses;
 
 macro_rules! some_ref_or(
     ($e:expr, $err:expr) => (match $e { Some(ref mut e) => e, None => return $err }))
@@ -56,7 +61,8 @@ pub enum PeerError
     NotConnected,
     DoubleHandshake,
     UnsupportedProtoVersion,
-    PingTimeout
+    PingTimeout,
+    _AddressMngError
 }
 
 impl PeerError
@@ -77,16 +83,17 @@ static PERIODIC_PERIOD_S : uint = 5;
 
 static PERIOD_PING_S : uint = 2*60;
 static PERIOD_TIMEOUT_CHECK_S : uint = 10;
+static PERIOD_ANNOUNCE_ADDRS_S : uint = 5*60;
 
 static TIMEOUT_S : uint = 10*60;
 
 pub struct Peer
 {
-    addr              : SocketAddr,
-    socket            : Option<TcpStream>,
-    version           : Option<Version>,
-    last_ping         : Option<Timespec>,
-    addr_pool_channel : AddressPoolChannel
+    addr            : SocketAddr,
+    socket          : Option<TcpStream>,
+    version         : Option<Version>,
+    last_ping       : Option<Timespec>,
+    addrmng_channel : AddrManagerChannel
 }
 
 static TIMEOUT_CONNECT_MS : uint = 10000;
@@ -94,16 +101,16 @@ static TIMEOUT_WRITE_MS : uint = 5*60*1000;
 
 impl Peer
 {
-    pub fn new(addr : SocketAddr,
-               addr_pool_channel : AddressPoolChannel) -> Peer
+    pub fn new(addr            : SocketAddr,
+               addrmng_channel : AddrManagerChannel) -> Peer
     {
         Peer
         {
-            addr:              addr,
-            socket:            None,
-            version:           None,
-            last_ping:         None,
-            addr_pool_channel: addr_pool_channel
+            addr:            addr,
+            socket:          None,
+            version:         None,
+            last_ping:       None,
+            addrmng_channel: addrmng_channel
         }
     }
 
@@ -159,7 +166,7 @@ impl Peer
         Ok(())
     }
 
-    fn send_versionack(&mut self) -> Result<(),PeerError>
+    fn send_verack(&mut self) -> Result<(),PeerError>
     {
         let verack = VerAck::new();
 
@@ -230,6 +237,55 @@ impl Peer
         Ok(())
     }
 
+    fn send_addr(&mut self, addrs : &Vec<NetAddr>) -> Result<(),PeerError>
+    {
+        let addr = Addr::from_addrs(addrs);
+
+        println!("<<< {}  {:30} command: {:9}",
+                 time::now().rfc822z(),
+                 self.addr,
+                 "addr");
+
+        try!(self.send(&addr.serialize()));
+
+        println!("{:4}",addr);
+
+        Ok(())
+    }
+
+    fn addr_mng_send(&self, request : AddrManagerRequest)
+    {
+        let (ref sender, _) = self.addrmng_channel;
+
+        sender.send(request);
+    }
+
+    fn addr_mng_send_recv(&self, request : AddrManagerRequest) -> AddrManagerReply
+    {
+        let (_, ref receiver) = self.addrmng_channel;
+
+        self.addr_mng_send(request);
+
+        receiver.recv()
+    }
+
+    fn addr_mng_add_self(&self)
+    {
+        let mut singleton_addrs : Vec<NetAddr> = Vec::with_capacity(1);
+        let addr : NetAddr;
+
+        assert!(self.version.is_some());
+
+        addr = self.version.as_ref().unwrap().get_addr_send().clone();
+
+        singleton_addrs.push(addr);
+
+        if addr.is_valid_addr()
+        {
+            self.addr_mng_send(AddrMngAddAddresses(singleton_addrs));
+        }
+    }
+
     fn handle_version(&mut self, version : Version) -> Result<(),PeerError>
     {
         println!("{:4}",version);
@@ -247,12 +303,14 @@ impl Peer
 
         self.version = Some(version);
 
-        try!(self.send_versionack());
+        try!(self.send_verack());
+
+        self.addr_mng_add_self();
 
         Ok(())
     }
 
-    fn handle_versionack(&mut self, verack : VerAck) -> Result<(),PeerError>
+    fn handle_verack(&mut self, verack : VerAck) -> Result<(),PeerError>
     {
         println!("{:4}",verack);
 
@@ -289,13 +347,11 @@ impl Peer
         Ok(())
     }
 
-    fn handle_addresses(&mut self, addrs : Addr) -> Result<(),PeerError>
+    fn handle_addr(&mut self, addrs : Addr) -> Result<(),PeerError>
     {
-        let (ref sender, _) = self.addr_pool_channel;
-
         println!("{:4}",addrs);
 
-        sender.send(AddrPoolAddAddresses(addrs.get_addresses().clone()));
+        self.addr_mng_send(AddrMngAddAddresses(addrs.get_addresses().clone()));
 
         Ok(())
     }
@@ -330,6 +386,24 @@ impl Peer
         Ok(())
     }
 
+    fn announce_addresses(&mut self) -> Result<(),PeerError>
+    {
+        let reply = self.addr_mng_send_recv(AddrMngGetAddresses);
+
+        match reply
+        {
+            AddrMngAddresses(addrs) =>
+            {
+                println!("XXX Peer: got {}",addrs);
+
+                assert!(addrs.len() <= ::message::addr::MSG_ADDR_MAX);
+
+                self.send_addr(&addrs)
+            },
+            // _ => Err(AddressMngError)
+        }
+    }
+
     fn periodic_sendping(&mut self) -> Result<(),PeerError>
     {
         if self.last_ping.is_none()
@@ -356,6 +430,11 @@ impl Peer
         Ok(())
     }
 
+    fn periodic_announce_addrs(&mut self) -> Result<(),PeerError>
+    {
+        self.announce_addresses()
+    }
+
     /* Warning: This ignores non fatal errors, i.e. it returns Ok with non-fatal
      *          errors
      */
@@ -371,6 +450,7 @@ impl Peer
                 {
                     PeriodicPing         => self.periodic_sendping(),
                     PeriodicTimeoutCheck => self.periodic_timeout_check(),
+                    PeriodicAnnounceAddresses => self.periodic_announce_addrs()
                 };
 
                 match result
@@ -394,6 +474,8 @@ impl Peer
                                      PeriodicPing));
         periodics.push(Periodic::new(Duration::seconds(PERIOD_TIMEOUT_CHECK_S as i64),
                                      PeriodicTimeoutCheck));
+        periodics.push(Periodic::new(Duration::seconds(PERIOD_ANNOUNCE_ADDRS_S as i64),
+                                     PeriodicAnnounceAddresses));
 
         periodics
     }
@@ -439,15 +521,15 @@ impl Peer
 
             result = match maybemsg.unwrap()
             {
-                MsgVersion(version)   => self.handle_version(version),
-                MsgVerAck(verack)     => self.handle_versionack(verack),
-                MsgPing(ping)         => self.handle_ping(ping),
-                MsgPong(pong)         => self.handle_pong(pong),
-                MsgAddr(addrs)        => self.handle_addresses(addrs),
-                MsgInv(inv)           => self.handle_inv(inv),
-                MsgGetData(getdata)   => self.handle_getdata(getdata),
-                MsgReject(reject)     => self.handle_reject(reject),
-                MsgTx(tx)             => self.handle_tx(tx),
+                MsgVersion(version) => self.handle_version(version),
+                MsgVerAck(verack)   => self.handle_verack(verack),
+                MsgPing(ping)       => self.handle_ping(ping),
+                MsgPong(pong)       => self.handle_pong(pong),
+                MsgAddr(addrs)      => self.handle_addr(addrs),
+                MsgInv(inv)         => self.handle_inv(inv),
+                MsgGetData(getdata) => self.handle_getdata(getdata),
+                MsgReject(reject)   => self.handle_reject(reject),
+                MsgTx(tx)           => self.handle_tx(tx),
             };
 
             match result
@@ -462,7 +544,8 @@ impl Peer
 enum PeriodicToken
 {
     PeriodicPing,
-    PeriodicTimeoutCheck
+    PeriodicTimeoutCheck,
+    PeriodicAnnounceAddresses
 }
 
 /* TODO: Remove token and instead store a closure with the call to run.
@@ -512,16 +595,16 @@ impl Periodic
  *
  *                recv | send
  * ___________________________
- * version          v  |   v
- * verack           v  |   v
- * ping             v  |   v
- * pong             v  |   v
- * addr             v  |
- * inv              v  |
- * getdata             |   v
- * reject           v  |
- * tx               v  |
+ * version          F  |   F
+ * verack           F  |   F
+ * ping             F  |   F
+ * pong             F  |   F
+ * addr             F  |   F
  * getaddr             |
+ * inv              P  |
+ * getdata             |   P
+ * reject           P  |
+ * tx               P  |
  * block               |
  * notfound            |
  * getblocks           |
