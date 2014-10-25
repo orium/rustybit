@@ -86,6 +86,7 @@ static PERIODIC_PERIOD_S : uint = 5;
 static PERIOD_PING_S : uint = 2*60;
 static PERIOD_TIMEOUT_CHECK_S : uint = 10;
 static PERIOD_ANNOUNCE_ADDRS_S : uint = 15*60;
+static PERIOD_REQUEST_ADDRS_S : uint = 30*60;
 
 static TIMEOUT_S : uint = 10*60;
 
@@ -94,7 +95,10 @@ pub struct Peer
     addr            : SocketAddr,
     socket          : Option<TcpStream>,
     version         : Option<Version>,
+    /* last time we sent (and we are waiting for the pong) */
     last_ping       : Option<Timespec>,
+    /* last time we received an addr msg */
+    last_addr       : Option<Timespec>,
     addrmng_channel : AddrManagerChannel
 }
 
@@ -112,6 +116,7 @@ impl Peer
             socket:          None,
             version:         None,
             last_ping:       None,
+            last_addr:       None,
             addrmng_channel: addrmng_channel
         }
     }
@@ -200,7 +205,7 @@ impl Peer
 
         try!(self.send(&ping.serialize()));
 
-        self.last_ping = Some(time::now_utc().to_timespec());
+        self.last_ping = Some(now);
 
         println!("{:4}",ping);
 
@@ -253,6 +258,18 @@ impl Peer
         println!("{:4}",addr);
 
         Ok(())
+    }
+
+    fn send_getaddr(&mut self) -> Result<(),PeerError>
+    {
+        let getaddr = GetAddr::new();
+
+        println!("<<< {}  {:30} command: {:9}",
+                 time::now().rfc822z(),
+                 self.addr,
+                 "getaddr");
+
+        self.send(&getaddr.serialize())
     }
 
     fn addr_mng_send(&self, request : AddrManagerRequest)
@@ -351,9 +368,12 @@ impl Peer
 
     fn handle_addr(&mut self, addrs : Addr) -> Result<(),PeerError>
     {
+        let now : Timespec = time::now_utc().to_timespec();
         println!("{:4}",addrs);
 
         self.addr_mng_send(AddrMngAddAddresses(addrs.get_addresses().clone()));
+
+        self.last_addr = Some(now);
 
         Ok(())
     }
@@ -442,6 +462,26 @@ impl Peer
         self.announce_addresses()
     }
 
+    fn periodic_request_addrs(&mut self) -> Result<(),PeerError>
+    {
+        let now = time::now_utc().to_timespec();
+        let then;
+
+        if self.last_addr.is_none()
+        {
+            return self.send_getaddr();
+        }
+
+        then = self.last_addr.unwrap();
+
+        if now > then+Duration::seconds(PERIOD_REQUEST_ADDRS_S as i64)
+        {
+            return self.send_getaddr();
+        }
+
+        Ok(())
+    }
+
     /* Warning: This ignores non fatal errors, i.e. it returns Ok with non-fatal
      *          errors
      */
@@ -457,7 +497,8 @@ impl Peer
                 {
                     PeriodicPing         => self.periodic_sendping(),
                     PeriodicTimeoutCheck => self.periodic_timeout_check(),
-                    PeriodicAnnounceAddresses => self.periodic_announce_addrs()
+                    PeriodicAnnounceAddresses => self.periodic_announce_addrs(),
+                    PeriodicRequestAddresses  => self.periodic_request_addrs()
                 };
 
                 match result
@@ -483,6 +524,8 @@ impl Peer
                                      PeriodicTimeoutCheck));
         periodics.push(Periodic::new(Duration::seconds(PERIOD_ANNOUNCE_ADDRS_S as i64),
                                      PeriodicAnnounceAddresses));
+        periodics.push(Periodic::new(Duration::seconds(PERIOD_REQUEST_ADDRS_S as i64),
+                                     PeriodicRequestAddresses));
 
         periodics
     }
@@ -553,7 +596,8 @@ enum PeriodicToken
 {
     PeriodicPing,
     PeriodicTimeoutCheck,
-    PeriodicAnnounceAddresses
+    PeriodicAnnounceAddresses,
+    PeriodicRequestAddresses
 }
 
 /* TODO: Remove token and instead store a closure with the call to run.
@@ -608,7 +652,7 @@ impl Periodic
  * ping             F  |   F
  * pong             F  |   F
  * addr             F  |   F
- * getaddr          F  |
+ * getaddr          F  |   F
  * inv              P  |
  * getdata             |   P
  * reject           P  |
