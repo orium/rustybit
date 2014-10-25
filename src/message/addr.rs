@@ -5,6 +5,8 @@ use message::header::Header;
 
 use datatype::netaddr::NetAddr;
 
+pub static MSG_ADDR_MAX : uint = 1000;
+
 pub struct Addr
 {
     addresses : Vec<NetAddr>
@@ -21,11 +23,19 @@ impl Addr
         }
     }
 
+    pub fn from_addrs(addrs : &Vec<NetAddr>) -> Addr
+    {
+        Addr
+        {
+            addresses: addrs.clone()
+        }
+    }
+
     pub fn add(&mut self, addr : NetAddr)
     {
         self.addresses.push(addr);
 
-        assert!(self.addresses.len() <= 1000);
+        assert!(self.addresses.len() <= MSG_ADDR_MAX);
     }
 
     pub fn get_addresses(&self) -> &Vec<NetAddr>

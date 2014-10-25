@@ -105,7 +105,6 @@ fn get_last_snapshot_getaddr_bitnodes_io() -> Result<String,()>
     Ok(unwrap_err_nil!(lastest_snapshots_url.as_string()).to_string())
 }
 
-
 fn discover_getaddr_bitnodes_io() -> Vec<SocketAddr>
 {
     let snapshot_url : String;
