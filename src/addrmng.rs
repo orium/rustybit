@@ -66,13 +66,9 @@ impl AddrManager
 
     fn handle_add_addresses(&mut self, addrs : Vec<NetAddr>)
     {
-        let num : uint;
-
         println!("XXX Address Manager: Add addresses: {}",addrs);
 
-        num = ::crypto::rand_interval(ANNOUNCE_ADDRS_MIN,ANNOUNCE_ADDRS_MAX);
-
-        for addr in addrs.iter().take(num)
+        for addr in addrs.iter()
         {
             self.addresses.insert(*addr);
         }
@@ -81,7 +77,23 @@ impl AddrManager
 
         if self.addresses.len() > 1000
         {
-            self.addresses.clear();
+            let mut to_remove : Vec<NetAddr> = Vec::new();
+
+            for addr in self.addresses.iter()
+            {
+                if ::crypto::rand_interval(0,1) == 0
+                {
+                    to_remove.push(*addr);
+                }
+            }
+
+            for addr in to_remove.iter()
+            {
+                self.addresses.remove(addr);
+            }
+
+            println!("XXX Address Manager: addresses size after cleanup: {}",
+                     self.addresses.len());
         }
     }
 
@@ -93,9 +105,10 @@ impl AddrManager
 
     fn handle_get_addrs(&self, channelid : uint)
     {
-        let mut addrs : Vec<NetAddr> = Vec::with_capacity(20);
+        let num = ::crypto::rand_interval(ANNOUNCE_ADDRS_MIN,ANNOUNCE_ADDRS_MAX);
+        let mut addrs : Vec<NetAddr> = Vec::with_capacity(num);
 
-        for addr in self.addresses.iter()
+        for addr in self.addresses.iter().take(num)
         {
             if addr.is_valid_addr()
             {
@@ -115,7 +128,7 @@ impl AddrManager
         match request
         {
             AddrMngAddAddresses(addrs) => self.handle_add_addresses(addrs),
-            AddrMngGetAddresses => self.handle_get_addrs(channelid),
+            AddrMngGetAddresses        => self.handle_get_addrs(channelid),
             AddrMngAddPeerChannel(s,r) => self.handle_add_channel((s,r))
         }
     }
@@ -188,8 +201,21 @@ impl AddrManager
 /* TODO
  *
  * Goals:
- * * Only keep a limited number of addresses around.
- *      say 4K addresses
- * * Make sure no (localized) attacker can fill the entire table with his
- *   nodes/addresses.
+ * 1. Only keep a limited number of addresses.
+ * 2. Keep addresses fresh.
+ * 3. Make sure no single attacker can fill the entire table.
+ * 4. Make sure no attacker can fill the entire table with nodes/addresses
+ *    he controls (assume nodes are geographically close).
+ * 5. Always serve some tried addresses.
+ *
+ * Policy:
+ *
+ * * (2) Drop old addresses (with >= 3h)
+ * * (3) Any peer can only add X addrs per hour
+ * * (1) Have a pool of, at most, 4K addresses
+ *       * (1,2) To drop addresses select older
+ * * (5) Keep a small pool of tried addresses and serve at least X of them.
+ * * (4) See bitcoin core
+ *
+ * How do we judge oldness? we cannot trust peers completly.
  */

@@ -185,8 +185,16 @@ fn main()
  *  * There are asserts that need to be verified in runtime and handled
  *    gracefully instead of terminating the task
  *    (eg. Unmarshalling::read_strvar()).
- *  * Logger
  *  * Carefuly audit block consensus to be 100% equal to the core implementation
  *     * Test block acceptence: https://github.com/TheBlueMatt/test-scripts
  *     * There will be an official concesus library. When that's ready, use it.
+ *
+ * Short term
+ *
+ *  * Logger
+ *  * get external ip
+ *  * Accept connections
+ *  * addrmng save peers on disk
+ *  * peer discovery read peers on disk
+ *  * peer discovery with random prob (not equally distributed)
  */
