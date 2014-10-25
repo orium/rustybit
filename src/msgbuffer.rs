@@ -12,6 +12,7 @@ use message::MsgInv;
 use message::MsgGetData;
 use message::MsgReject;
 use message::MsgTx;
+use message::MsgGetAddr;
 
 use message::version::Version;
 use message::verack::VerAck;
@@ -22,6 +23,7 @@ use message::inv::Inv;
 use message::getdata::GetData;
 use message::reject::Reject;
 use message::tx::Tx;
+use message::getaddr::GetAddr;
 
 use message::header::Header;
 use message::header::HEADER_SIZE;
@@ -237,6 +239,14 @@ impl MsgBuffer
                 tx = Tx::unserialize(&self.buf);
 
                 Ok(MsgTx(tx))
+            },
+            "getaddr" =>
+            {
+                let getaddr : GetAddr;
+
+                getaddr = GetAddr::unserialize(&self.buf);
+
+                Ok(MsgGetAddr(getaddr))
             },
             _ => Err(ReadMsgUnknownCommand)
         };

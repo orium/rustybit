@@ -16,6 +16,7 @@ use message::MsgInv;
 use message::MsgGetData;
 use message::MsgReject;
 use message::MsgTx;
+use message::MsgGetAddr;
 
 use message::version::Version;
 use message::verack::VerAck;
@@ -26,6 +27,7 @@ use message::inv::Inv;
 use message::getdata::GetData;
 use message::reject::Reject;
 use message::tx::Tx;
+use message::getaddr::GetAddr;
 
 use datatype::invvect::InvVect;
 use datatype::netaddr::NetAddr;
@@ -83,7 +85,7 @@ static PERIODIC_PERIOD_S : uint = 5;
 
 static PERIOD_PING_S : uint = 2*60;
 static PERIOD_TIMEOUT_CHECK_S : uint = 10;
-static PERIOD_ANNOUNCE_ADDRS_S : uint = 5*60;
+static PERIOD_ANNOUNCE_ADDRS_S : uint = 15*60;
 
 static TIMEOUT_S : uint = 10*60;
 
@@ -386,6 +388,11 @@ impl Peer
         Ok(())
     }
 
+    fn handle_getaddr(&mut self, _getaddr : GetAddr) -> Result<(),PeerError>
+    {
+        self.announce_addresses()
+    }
+
     fn announce_addresses(&mut self) -> Result<(),PeerError>
     {
         let reply = self.addr_mng_send_recv(AddrMngGetAddresses);
@@ -530,6 +537,7 @@ impl Peer
                 MsgGetData(getdata) => self.handle_getdata(getdata),
                 MsgReject(reject)   => self.handle_reject(reject),
                 MsgTx(tx)           => self.handle_tx(tx),
+                MsgGetAddr(getaddr) => self.handle_getaddr(getaddr),
             };
 
             match result
@@ -600,7 +608,7 @@ impl Periodic
  * ping             F  |   F
  * pong             F  |   F
  * addr             F  |   F
- * getaddr             |
+ * getaddr          F  |
  * inv              P  |
  * getdata             |   P
  * reject           P  |

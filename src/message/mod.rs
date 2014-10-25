@@ -8,6 +8,7 @@ pub mod inv;
 pub mod getdata;
 pub mod reject;
 pub mod tx;
+pub mod getaddr;
 
 pub enum Message
 {
@@ -19,5 +20,6 @@ pub enum Message
     MsgInv(inv::Inv),
     MsgGetData(getdata::GetData),
     MsgReject(reject::Reject),
-    MsgTx(tx::Tx)
+    MsgTx(tx::Tx),
+    MsgGetAddr(getaddr::GetAddr)
 }
