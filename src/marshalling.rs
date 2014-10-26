@@ -153,11 +153,15 @@ impl Marshalling
         self.write_int64(time.sec);
     }
 
-    pub fn write_netaddr(&mut self, netaddr : &NetAddr)
+    pub fn write_netaddr(&mut self, netaddr : &NetAddr, with_time : bool)
     {
-        if netaddr.time.is_some()
+        if with_time
         {
-            self.write_timestampu32(netaddr.time.unwrap());
+            match netaddr.time
+            {
+                Some(ts) => self.write_timestampu32(ts),
+                None     => self.write_uint32(0),
+            }
         }
 
         self.write_uint64(netaddr.services as u64);

@@ -58,8 +58,8 @@ impl Version
         msg.write_uint32(self.proto_ver);
         msg.write_uint64(self.services);
         msg.write_timestamp64(self.time);
-        msg.write_netaddr(&self.addr_recv);
-        msg.write_netaddr(&self.addr_send);
+        msg.write_netaddr(&self.addr_recv,false);
+        msg.write_netaddr(&self.addr_send,false);
         msg.write_uint64(self.nounce);
         msg.write_varstr(&self.version);
         msg.write_uint32(self.best_height);

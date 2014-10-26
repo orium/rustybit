@@ -52,7 +52,7 @@ impl Addr
 
         for addr in self.addresses.iter()
         {
-            msg.write_netaddr(addr);
+            msg.write_netaddr(addr,true);
         }
 
         header = Header::new(::config::NETWORK,
