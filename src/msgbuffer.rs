@@ -127,8 +127,6 @@ impl MsgBuffer
 
         if header.get_payload_size() > PAYLOAD_MAX_SIZE
         {
-            println!("message payload length too big");
-
             return Err(ReadMsgPayloadTooBig);
         }
 
@@ -144,26 +142,13 @@ impl MsgBuffer
 
         if ::crypto::checksum(&self.buf) != header.get_checksum()
         {
-            println!("invalid checksum");
-
-            self.buf.clear();
-
             return Err(ReadMsgInvalidChecksum);
         }
 
         if header.get_network() != ::config::NETWORK
         {
-            println!("wrong network");
-
-            self.buf.clear();
-
             return Err(ReadMsgWrongNetwork);
         }
-
-        println!(">>> {}  {} \tcommand: {:9}",
-                 time::now().rfc822z(),
-                 socket.peer_name().unwrap(),
-                 header.get_command());
 
         msg = match header.get_command().as_slice()
         {

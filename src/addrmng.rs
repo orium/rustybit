@@ -1,5 +1,8 @@
 extern crate sync;
 
+use std::fmt::Show;
+use std::fmt::Formatter;
+
 use std::comm::Handle;
 use std::collections::HashSet;
 
@@ -30,10 +33,36 @@ pub enum AddrManagerRequest
     AddrMngGetAddresses
 }
 
-#[deriving(Show)]
 pub enum AddrManagerReply
 {
     AddrMngAddresses(Vec<NetAddr>)
+}
+
+impl Show for AddrManagerRequest
+{
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    {
+        match *self
+        {
+            AddrMngAddAddresses(ref addrs) =>
+                write!(f,"Add Addresses: {}",addrs),
+            AddrMngAddPeerChannel(_,_) =>
+                write!(f,"New channel"),
+            AddrMngGetAddresses =>
+                write!(f,"Addresses request")
+        }
+    }
+}
+
+impl Show for AddrManagerReply
+{
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    {
+        match *self
+        {
+            AddrMngAddresses(ref addrs) => write!(f,"Addresses: {}",addrs)
+        }
+    }
 }
 
 pub struct AddrManager
@@ -61,19 +90,20 @@ impl AddrManager
     {
         let (ref sender, _) = self.channels[channelid];
 
+        ::logger::log_addr_mng_reply(&msg);
+
         sender.send(msg);
     }
 
     fn handle_add_addresses(&mut self, addrs : Vec<NetAddr>)
     {
-        println!("XXX Address Manager: Add addresses: {}",addrs);
-
         for addr in addrs.iter()
         {
             self.addresses.insert(*addr);
         }
 
-        println!("XXX Address Manager: addresses size: {}",self.addresses.len());
+        ::logger::log_addr_mng(format!("addresses size: {}",
+                                       self.addresses.len()).as_slice());
 
         if self.addresses.len() > 1000
         {
@@ -92,15 +122,14 @@ impl AddrManager
                 self.addresses.remove(addr);
             }
 
-            println!("XXX Address Manager: addresses size after cleanup: {}",
-                     self.addresses.len());
+            ::logger::log_addr_mng(format!("addresses after cleanup: {}",
+                                           self.addresses.len()).as_slice());
         }
     }
 
     fn handle_add_channel(&mut self, channel : PeerChannel)
     {
         self.channels.push(channel);
-        println!("XXX Address Manager: Add peer channel");
     }
 
     fn handle_get_addrs(&self, channelid : uint)
@@ -116,8 +145,6 @@ impl AddrManager
             }
         }
 
-        println!("XXX Address Manager: Get addresses: {}",addrs);
-
         self.send(channelid,AddrMngAddresses(addrs));
     }
 
@@ -125,6 +152,8 @@ impl AddrManager
                       channelid : uint,
                       request   : AddrManagerRequest)
     {
+        ::logger::log_addr_mng_request(&request);
+
         match request
         {
             AddrMngAddAddresses(addrs) => self.handle_add_addresses(addrs),
@@ -187,7 +216,7 @@ impl AddrManager
                     Err(Empty)        => (),
                     Err(Disconnected) =>
                     {
-                        println!("XXX Address Manager: disconnect");
+                        ::logger::log_addr_mng("disconnected");
 
                         self.channels.remove(i);
                         break;

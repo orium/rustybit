@@ -63,8 +63,7 @@ pub enum PeerError
     NotConnected,
     DoubleHandshake,
     UnsupportedProtoVersion,
-    PingTimeout,
-    _AddressMngError
+    PingTimeout
 }
 
 impl PeerError
@@ -161,14 +160,9 @@ impl Peer
     {
         let version = Version::new(::config::name_version_bip0014(),0);
 
-        println!("<<< {}  {:30} command: {:9}",
-                 time::now().rfc822z(),
-                 self.addr,
-                 "version");
-
         try!(self.send(&version.serialize()));
 
-        println!("{:4}",version);
+        ::logger::log_sent_msg(&self.addr,&MsgVersion(version));
 
         Ok(())
     }
@@ -177,14 +171,9 @@ impl Peer
     {
         let verack = VerAck::new();
 
-        println!("<<< {}  {:30} command: {:9}",
-                 time::now().rfc822z(),
-                 self.addr,
-                 "verack");
-
         try!(self.send(&verack.serialize()));
 
-        println!("{:4}",verack);
+        ::logger::log_sent_msg(&self.addr,&MsgVerAck(verack));
 
         Ok(())
     }
@@ -198,16 +187,11 @@ impl Peer
 
         ping = Ping::new(((now.sec as u64)<<10) | ((now.nsec as u64)/1_000_000));
 
-        println!("<<< {}  {:30} command: {:9}",
-                 time::now().rfc822z(),
-                 self.addr,
-                 "ping");
-
         try!(self.send(&ping.serialize()));
 
         self.last_ping = Some(now);
 
-        println!("{:4}",ping);
+        ::logger::log_sent_msg(&self.addr,&MsgPing(ping));
 
         Ok(())
     }
@@ -216,14 +200,9 @@ impl Peer
     {
         let pong = Pong::new(nounce);
 
-        println!("<<< {}  {:30} command: {:9}",
-                 time::now().rfc822z(),
-                 self.addr,
-                 "pong");
-
         try!(self.send(&pong.serialize()));
 
-        println!("{:4}",pong);
+        ::logger::log_sent_msg(&self.addr,&MsgPong(pong));
 
         Ok(())
     }
@@ -232,14 +211,9 @@ impl Peer
     {
         let getdata = GetData::from_inv(inv);
 
-        println!("<<< {}  {:30} command: {:9}",
-                 time::now().rfc822z(),
-                 self.addr,
-                 "getdata");
-
         try!(self.send(&getdata.serialize()));
 
-        println!("{:4}",getdata);
+        ::logger::log_sent_msg(&self.addr,&MsgGetData(getdata));
 
         Ok(())
     }
@@ -248,14 +222,9 @@ impl Peer
     {
         let addr = Addr::from_addrs(addrs);
 
-        println!("<<< {}  {:30} command: {:9}",
-                 time::now().rfc822z(),
-                 self.addr,
-                 "addr");
-
         try!(self.send(&addr.serialize()));
 
-        println!("{:4}",addr);
+        ::logger::log_sent_msg(&self.addr,&MsgAddr(addr));
 
         Ok(())
     }
@@ -264,12 +233,11 @@ impl Peer
     {
         let getaddr = GetAddr::new();
 
-        println!("<<< {}  {:30} command: {:9}",
-                 time::now().rfc822z(),
-                 self.addr,
-                 "getaddr");
+        try!(self.send(&getaddr.serialize()));
 
-        self.send(&getaddr.serialize())
+        ::logger::log_sent_msg(&self.addr,&MsgGetAddr(getaddr));
+
+        Ok(())
     }
 
     fn addr_mng_send(&self, request : AddrManagerRequest)
@@ -307,8 +275,6 @@ impl Peer
 
     fn handle_version(&mut self, version : Version) -> Result<(),PeerError>
     {
-        println!("{:4}",version);
-
         /* Do not allow a peer send a version msg twice */
         if self.version.is_some()
         {
@@ -320,27 +286,29 @@ impl Peer
             return Err(UnsupportedProtoVersion);
         }
 
-        self.version = Some(version);
+        self.version = Some(version.clone());
 
         try!(self.send_verack());
 
         self.addr_mng_add_self();
+
+        ::logger::log_received_msg(&self.addr,&MsgVersion(version));
 
         Ok(())
     }
 
     fn handle_verack(&mut self, verack : VerAck) -> Result<(),PeerError>
     {
-        println!("{:4}",verack);
+        ::logger::log_received_msg(&self.addr,&MsgVerAck(verack));
 
         Ok(())
     }
 
     fn handle_ping(&mut self, ping : Ping) -> Result<(),PeerError>
     {
-        println!("{:4}",ping);
-
         try!(self.send_pong(ping.get_nounce()));
+
+        ::logger::log_received_msg(&self.addr,&MsgPing(ping));
 
         Ok(())
     }
@@ -359,58 +327,63 @@ impl Peer
 
         lag = now-then;
 
-        println!("{:4}",pong);
+        ::logger::log_received_msg(&self.addr,&MsgPong(pong));
 
-        println!("{}  Lag: {} ms",self.addr,lag.num_milliseconds());
+        ::logger::log_lag(&self.addr,&lag);
 
         Ok(())
     }
 
-    fn handle_addr(&mut self, addrs : Addr) -> Result<(),PeerError>
+    fn handle_addr(&mut self, addr : Addr) -> Result<(),PeerError>
     {
         let now : Timespec = time::now_utc().to_timespec();
-        println!("{:4}",addrs);
 
-        self.addr_mng_send(AddrMngAddAddresses(addrs.get_addresses().clone()));
+        self.addr_mng_send(AddrMngAddAddresses(addr.get_addresses().clone()));
 
         self.last_addr = Some(now);
+
+        ::logger::log_received_msg(&self.addr,&MsgAddr(addr));
 
         Ok(())
     }
 
     fn handle_inv(&mut self, inv : Inv) -> Result<(),PeerError>
     {
-        println!("{:4}",inv);
-
         try!(self.send_getdata(inv.get_invvect()));
+
+        ::logger::log_received_msg(&self.addr,&MsgInv(inv));
 
         Ok(())
     }
 
     fn handle_getdata(&mut self, getdata : GetData) -> Result<(),PeerError>
     {
-        println!("{:4}",getdata);
+        ::logger::log_received_msg(&self.addr,&MsgGetData(getdata));
 
         Ok(())
     }
 
     fn handle_reject(&mut self, reject : Reject) -> Result<(),PeerError>
     {
-        println!("{:4}",reject);
+        ::logger::log_received_msg(&self.addr,&MsgReject(reject));
 
         Ok(())
     }
 
     fn handle_tx(&mut self, tx : Tx) -> Result<(),PeerError>
     {
-        println!("{:4}",tx);
+        ::logger::log_received_msg(&self.addr,&MsgTx(tx));
 
         Ok(())
     }
 
-    fn handle_getaddr(&mut self, _getaddr : GetAddr) -> Result<(),PeerError>
+    fn handle_getaddr(&mut self, getaddr : GetAddr) -> Result<(),PeerError>
     {
-        self.announce_addresses()
+        try!(self.announce_addresses());
+
+        ::logger::log_received_msg(&self.addr,&MsgGetAddr(getaddr));
+
+        Ok(())
     }
 
     fn announce_addresses(&mut self) -> Result<(),PeerError>
@@ -421,13 +394,10 @@ impl Peer
         {
             AddrMngAddresses(addrs) =>
             {
-                println!("XXX Peer: got {}",addrs);
-
                 assert!(addrs.len() <= ::message::addr::MSG_ADDR_MAX);
 
                 self.send_addr(&addrs)
             },
-            // _ => Err(AddressMngError)
         }
     }
 
@@ -614,8 +584,8 @@ struct Periodic
 
 impl Periodic
 {
-    pub fn new<'a>(interval : Duration,
-                   token : PeriodicToken) -> Periodic
+    pub fn new(interval : Duration,
+               token : PeriodicToken) -> Periodic
     {
         Periodic
         {

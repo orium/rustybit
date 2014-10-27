@@ -24,6 +24,7 @@ mod marshalling;
 mod crypto;
 mod msgbuffer;
 mod message;
+mod logger;
 mod peer;
 mod peerdiscovery;
 mod addrmng;
@@ -65,9 +66,11 @@ fn parse_options() -> Option<Options>
                  optflag("v", "version", OPT_DESC_VERSION) ];
     let matches : getopts::Matches;
 
-    matches = match getopts::getopts(std::os::args().as_slice(), opts) {
-        Ok(m) => m,
-        Err(e) => {
+    matches = match getopts::getopts(std::os::args().as_slice(), opts)
+    {
+        Ok(m)  => m,
+        Err(e) =>
+        {
             (write!(std::io::stderr(),"error: {}\n", e)).unwrap();
             return None;
         }
@@ -102,7 +105,7 @@ fn spawn_thread_run_peer(address      : SocketAddr,
         {
             Err(err) =>
             {
-                (write!(std::io::stderr(),"{} Error: {}\n",address,err)).unwrap();
+                logger::log_peer_error_fatal(&address, err);
             },
             _        => unreachable!()
         }
@@ -191,7 +194,6 @@ fn main()
  *
  * Short term
  *
- *  * Logger
  *  * get external ip
  *  * Accept connections
  *  * addrmng save peers on disk

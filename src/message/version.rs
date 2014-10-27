@@ -8,6 +8,7 @@ use std::fmt::Formatter;
 use message::header::Header;
 use datatype::netaddr::NetAddr;
 
+#[deriving(Clone)]
 pub struct Version
 {
     proto_ver   : u32,
