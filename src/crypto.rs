@@ -5,28 +5,41 @@ use std::rand::OsRng;
 
 use self::openssl::crypto::hash::{SHA256,Hasher};
 
-pub fn sha256(data : &Vec<u8>) -> Vec<u8>
+pub fn sha256(data : &[u8]) -> [u8, ..32]
 {
     let hasher : Hasher = Hasher::new(SHA256);
+    let mut hash : [u8, ..32] = [0u8, ..32];
+    let final;
 
-    hasher.update(data.as_slice());
+    hasher.update(data);
 
-    hasher.finalize()
+    final = hasher.finalize();
+
+    for i in range(0,32)
+    {
+        hash[i] = final[i];
+    }
+
+    hash
 }
 
-pub fn dsha256(data : &Vec<u8>) -> Vec<u8>
+pub fn dsha256(data : &[u8]) -> [u8, ..32]
 {
     sha256(&sha256(data))
 }
 
-pub fn checksum(data : &Vec<u8>) -> u32
+pub fn checksum(data : &[u8]) -> u32
 {
-    let mut unmarshalling : ::marshalling::Unmarshalling;
-    let digest : Vec<u8> = dsha256(data);
+    let digest : [u8, ..32] = dsha256(data);
+    let mut checksum : u32 = 0;
 
-    unmarshalling = ::marshalling::Unmarshalling::new(&digest);
+    /* TODO use marshalling when it uses slices */
+    for i in range(0u,4)
+    {
+        checksum |= digest[i] as u32 << 8*i;
+    }
 
-    unmarshalling.read_uint32()
+    checksum
 }
 
 pub fn to_hexstr(data : &[u8]) -> String

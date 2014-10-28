@@ -19,7 +19,7 @@ impl VerAck
         header = Header::new(::config::NETWORK,
                              "verack".to_string(),
                              0u32,
-                             ::crypto::checksum(&Vec::new()));
+                             ::crypto::checksum([]));
 
         header.serialize()
     }

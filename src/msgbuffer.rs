@@ -140,7 +140,7 @@ impl MsgBuffer
 
         assert!(self.buf.len() == header.get_payload_size());
 
-        if ::crypto::checksum(&self.buf) != header.get_checksum()
+        if ::crypto::checksum(self.buf.as_slice()) != header.get_checksum()
         {
             return Err(ReadMsgInvalidChecksum);
         }

@@ -21,7 +21,7 @@ impl GetAddr
         header = Header::new(::config::NETWORK,
                              "getaddr".to_string(),
                              msg.len() as u32,
-                             ::crypto::checksum(&msg.get()));
+                             ::crypto::checksum(msg.get().as_slice()));
 
         header.serialize()
     }

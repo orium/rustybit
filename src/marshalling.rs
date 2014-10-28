@@ -22,6 +22,9 @@ static VARSTR_MAX_LENGTH : uint = 256;
 static VARSTR_SAFE_CHARS : &'static str
     = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890 .,;_/:?@";
 
+/* TODO don't use Vec<u8>. use &[u8]
+ */
+
 pub struct Marshalling
 {
     buf: Vec<u8>
