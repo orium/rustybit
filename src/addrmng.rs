@@ -3,6 +3,14 @@ extern crate sync;
 use std::fmt::Show;
 use std::fmt::Formatter;
 
+use std::io::net::ip::SocketAddr;
+use std::io::net::ip::Ipv4Addr;
+use std::io::net::ip::Ipv6Addr;
+
+use std::iter::AdditiveIterator;
+
+use std::rand::Rng;
+
 use std::comm::Handle;
 use std::collections::HashSet;
 
@@ -16,8 +24,11 @@ use datatype::netaddr::NetAddr;
 
 pub static ADDRMNG_CHANNEL_BUF_CAP : uint = 8;
 
-static ANNOUNCE_ADDRS_MIN : uint = 20;
-static ANNOUNCE_ADDRS_MAX : uint = 100;
+static MAX_ADDRESSES : uint = 2500;
+static BUCKETS : uint = 64;
+
+static ANNOUNCE_ADDRS_MIN : uint = 5;
+static ANNOUNCE_ADDRS_MAX : uint = 30;
 
 pub type AddrManagerChannel
     = (SyncSender<AddrManagerRequest>, Receiver<AddrManagerReply>);
@@ -67,8 +78,9 @@ impl Show for AddrManagerReply
 
 pub struct AddrManager
 {
-    channels : Vec<PeerChannel>,
-    addresses : HashSet<NetAddr>
+    channels  : Vec<PeerChannel>,
+    addresses : Vec<HashSet<NetAddr>>,
+    secret    : [u8, ..256]
 }
 
 impl AddrManager
@@ -76,13 +88,17 @@ impl AddrManager
     pub fn new(orchestrator : PeerChannel) -> AddrManager
     {
         let mut channels = Vec::new();
+        let mut secret : [u8, ..256] = [0u8, ..256];
 
         channels.push(orchestrator);
+
+        ::crypto::rng().fill_bytes(&mut secret);
 
         AddrManager
         {
             channels:  channels,
-            addresses: HashSet::new()
+            addresses: Vec::from_fn(BUCKETS, |_| HashSet::new()),
+            secret: secret
         }
     }
 
@@ -95,23 +111,47 @@ impl AddrManager
         sender.send(msg);
     }
 
-    fn handle_add_addresses(&mut self, addrs : Vec<NetAddr>)
+    /* We only take into account the /12 subnet.
+     */
+    fn get_bucket_idx(&self, addr : &NetAddr) -> uint
     {
-        for addr in addrs.iter()
+        let mut data : Vec<u8> = Vec::new();
+
+        data.push_all(&self.secret);
+
+        match addr.addr
         {
-            self.addresses.insert(*addr);
+            Some(SocketAddr { ip: Ipv6Addr(..), port: _ }) =>
+                unimplemented!(), /* TODO */
+            Some(SocketAddr { ip: Ipv4Addr(h0,h1,_,_), port: _ }) =>
+            {
+                data.push(h0);
+                data.push(h1&0xf0);
+            },
+            _  => unreachable!()
         }
 
-        ::logger::log_addr_mng(format!("addresses size: {}",
-                                       self.addresses.len()).as_slice());
+        data.push_all(&self.secret);
 
-        if self.addresses.len() > 1000
+        (::crypto::hash_first_u32(data.as_slice()) as uint)%BUCKETS
+    }
+
+    fn add_address(&mut self, addr : NetAddr)
+    {
+        let bucket : uint = self.get_bucket_idx(&addr);
+
+        println!("bucket: {}",bucket);
+
+        self.addresses.get_mut(bucket).insert(addr);
+
+        if self.addresses[bucket].len() > MAX_ADDRESSES/BUCKETS
         {
             let mut to_remove : Vec<NetAddr> = Vec::new();
 
-            for addr in self.addresses.iter()
+            // TODO make this not aweful
+            for addr in self.addresses[bucket].iter()
             {
-                if ::crypto::rand_interval(0,1) == 0
+                if ::crypto::rand_interval(0,10) == 0
                 {
                     to_remove.push(*addr);
                 }
@@ -119,11 +159,28 @@ impl AddrManager
 
             for addr in to_remove.iter()
             {
-                self.addresses.remove(addr);
+                self.addresses.get_mut(bucket).remove(addr);
             }
 
-            ::logger::log_addr_mng(format!("addresses after cleanup: {}",
-                                           self.addresses.len()).as_slice());
+            println!("bucket cleanup: dropped {} addresses",to_remove.len());
+        }
+
+        ::logger::log_addr_mng(format!("addresses: {}",
+                                       self.addresses.iter()
+                                                     .map(|b| b.len())
+                                                     .collect::<Vec<uint>>()
+                                       ).as_slice());
+        ::logger::log_addr_mng(format!("addresses size: {}",
+                                       self.addresses.iter()
+                                                     .map(|b| b.len())
+                                       .sum()).as_slice());
+    }
+
+    fn handle_add_addresses(&mut self, addrs : Vec<NetAddr>)
+    {
+        for addr in addrs.iter().filter(|addr| addr.is_valid_addr())
+        {
+            self.add_address(*addr);
         }
     }
 
@@ -137,13 +194,29 @@ impl AddrManager
         let num = ::crypto::rand_interval(ANNOUNCE_ADDRS_MIN,ANNOUNCE_ADDRS_MAX);
         let mut addrs : Vec<NetAddr> = Vec::with_capacity(num);
 
-        for addr in self.addresses.iter().take(num)
+        for _ in range(0,5*num)
         {
-            if addr.is_valid_addr()
+            let bucket = ::crypto::rand_interval(0,BUCKETS-1);
+            let amount = ::crypto::rand_interval(3,6); // TODO XXX contants?
+            let mut candidates : Vec<&NetAddr>;
+
+            if addrs.len() >= num
             {
-                addrs.push(*addr);
+                break;
+            }
+
+            candidates=self.addresses[bucket].iter().collect();
+
+            ::crypto::rng().shuffle(candidates.as_mut_slice());
+
+            for addr in candidates.iter().take(amount)
+            {
+                addrs.push(*addr.clone());
             }
         }
+
+        /* Shuffle addrs to minimize the bucket-related information leaked */
+        ::crypto::rng().shuffle(addrs.as_mut_slice());
 
         self.send(channelid,AddrMngAddresses(addrs));
     }
@@ -182,8 +255,9 @@ impl AddrManager
 
             handlers.push(sel.handle(receiver));
 
-            /* We make sure no rellocation happens, otherwise we moved the handlers,
-             * which cannot happen.  (It is required by the unsafe block above.)
+            /* We make sure no rellocation happens, otherwise we moved the
+             * handlers, which cannot happen.  (It is required by the unsafe
+             * block above.)
              */
             assert_eq!(cap,handlers.capacity());
 
@@ -227,24 +301,34 @@ impl AddrManager
     }
 }
 
-/* TODO
- *
- * Goals:
+/* Goals:
  * 1. Only keep a limited number of addresses.
  * 2. Keep addresses fresh.
  * 3. Make sure no single attacker can fill the entire table.
  * 4. Make sure no attacker can fill the entire table with nodes/addresses
  *    he controls (assume nodes are geographically close).
  * 5. Always serve some tried addresses.
+ * 6. Serve addresses that are geographically spread
  *
  * Policy:
  *
- * * (2) Drop old addresses (with >= 3h)
- * * (3) Any peer can only add X addrs per hour
- * * (1) Have a pool of, at most, 4K addresses
+ * * (2) Drop old addresses (with >= X hrs)
+ * * (3) Any peer cannot have more than X% of the addrs added by him
+ * * (1) Have a pool of, at most, 1K addresses
  *       * (1,2) To drop addresses select older
  * * (5) Keep a small pool of tried addresses and serve at least X of them.
- * * (4) See bitcoin core
+ * * (4) Use /12 subnet to determine one of the buckets.
+ *       Use cryptographic key so an attacker doesn't know how to fill a
+ *       specific bucket.
+ * * (6) When serving ips avoid serving more that X addrs from each bucket.
  *
  * How do we judge oldness? we cannot trust peers completly.
+ */
+
+/* TODO:
+ *
+ * * (2) Drop old addresses (with >= X hrs)
+ *       * (1,2) To drop addresses select older
+ * * (3) Any peer cannot have more than X% of the addrs added by him
+ * * (5) Keep a small pool of tried addresses and serve at least X of them.
  */

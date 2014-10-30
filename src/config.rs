@@ -21,7 +21,7 @@ pub static PROTOCOL_VERSION_MIN : u32 = 70002;
 pub enum Service
 {
     NoService   = 0,
-    NodeNetwork = 1 << 0,
+    NodeNetwork = 1
 }
 
 pub type Services = u64;

@@ -28,7 +28,7 @@ pub fn dsha256(data : &[u8]) -> [u8, ..32]
     sha256(&sha256(data))
 }
 
-pub fn checksum(data : &[u8]) -> u32
+pub fn hash_first_u32(data : &[u8]) -> u32
 {
     let digest : [u8, ..32] = dsha256(data);
     let mut checksum : u32 = 0;
@@ -40,6 +40,11 @@ pub fn checksum(data : &[u8]) -> u32
     }
 
     checksum
+}
+
+pub fn checksum(data : &[u8]) -> u32
+{
+    hash_first_u32(data)
 }
 
 pub fn to_hexstr(data : &[u8]) -> String
