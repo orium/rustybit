@@ -269,7 +269,7 @@ impl Peer
 
         if addr.is_valid_addr()
         {
-            self.addr_mng_send(AddrMngAddAddresses(singleton_addrs));
+            self.addr_mng_send(AddrMngAddAddresses(self.addr.ip,singleton_addrs));
         }
     }
 
@@ -338,7 +338,8 @@ impl Peer
     {
         let now : Timespec = time::now_utc().to_timespec();
 
-        self.addr_mng_send(AddrMngAddAddresses(addr.get_addresses().clone()));
+        self.addr_mng_send(AddrMngAddAddresses(self.addr.ip,
+                                               addr.get_addresses().clone()));
 
         self.last_addr = Some(now);
 

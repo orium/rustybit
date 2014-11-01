@@ -28,7 +28,7 @@ pub type Services = u64;
 
 pub static SERVICES : Services = NodeNetwork as Services;
 
-pub static INITIAL_DISCOVERY_PEERS : uint = 20;
+pub static INITIAL_DISCOVERY_PEERS : uint = 30;
 
 pub static DEFAULT_PORT : u16 = 8333;
 

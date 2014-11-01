@@ -3,7 +3,13 @@ extern crate sync;
 use std::fmt::Show;
 use std::fmt::Formatter;
 
+use std::hash::Hash;
+use std::hash::sip::SipState;
+use std::cmp::Eq;
+use std::cmp::PartialEq;
+
 use std::io::net::ip::SocketAddr;
+use std::io::net::ip::IpAddr;
 use std::io::net::ip::Ipv4Addr;
 use std::io::net::ip::Ipv6Addr;
 
@@ -13,6 +19,7 @@ use std::rand::Rng;
 
 use std::comm::Handle;
 use std::collections::HashSet;
+use std::collections::HashMap;
 
 use self::sync::comm::Receiver;
 use self::sync::comm::SyncSender;
@@ -27,8 +34,10 @@ pub static ADDRMNG_CHANNEL_BUF_CAP : uint = 8;
 static MAX_ADDRESSES : uint = 2500;
 static BUCKETS : uint = 64;
 
-static ANNOUNCE_ADDRS_MIN : uint = 5;
-static ANNOUNCE_ADDRS_MAX : uint = 30;
+static MAX_ADDRS_PER_PEER_PERCENT : f32 = 0.02;
+
+static ANNOUNCE_ADDRS_MIN : uint = 10;
+static ANNOUNCE_ADDRS_MAX : uint = 50;
 
 pub type AddrManagerChannel
     = (SyncSender<AddrManagerRequest>, Receiver<AddrManagerReply>);
@@ -38,7 +47,7 @@ type PeerChannel
 
 pub enum AddrManagerRequest
 {
-    AddrMngAddAddresses(Vec<NetAddr>),
+    AddrMngAddAddresses(IpAddr, Vec<NetAddr>),
     AddrMngAddPeerChannel(SyncSender<AddrManagerReply>,
                           Receiver<AddrManagerRequest>),
     AddrMngGetAddresses
@@ -55,8 +64,8 @@ impl Show for AddrManagerRequest
     {
         match *self
         {
-            AddrMngAddAddresses(ref addrs) =>
-                write!(f,"Add Addresses: {}",addrs),
+            AddrMngAddAddresses(ref peer, ref addrs) =>
+                write!(f,"{}: Adds Addresses: {}",peer,addrs),
             AddrMngAddPeerChannel(_,_) =>
                 write!(f,"New channel"),
             AddrMngGetAddresses =>
@@ -76,18 +85,57 @@ impl Show for AddrManagerReply
     }
 }
 
+struct Address
+{
+    pub peer    : IpAddr,
+    pub netaddr : NetAddr
+}
+
+impl Address
+{
+    pub fn new(netaddr : NetAddr, peer : IpAddr) -> Address
+    {
+        Address
+        {
+            peer:    peer,
+            netaddr: netaddr
+        }
+    }
+}
+
+impl Hash for Address
+{
+    fn hash(&self, state: &mut SipState)
+    {
+        self.netaddr.addr.hash(state);
+    }
+}
+
+impl PartialEq for Address
+{
+    fn eq(&self, other: &Address) -> bool
+    {
+        self.netaddr.addr == other.netaddr.addr
+    }
+}
+
+impl Eq for Address
+{
+}
+
 pub struct AddrManager
 {
-    channels  : Vec<PeerChannel>,
-    addresses : Vec<HashSet<NetAddr>>,
-    secret    : [u8, ..256]
+    channels       : Vec<PeerChannel>,
+    addresses      : Vec<HashSet<Address>>,
+    addrs_per_peer : HashMap<IpAddr,uint>,
+    secret         : [u8, ..256]
 }
 
 impl AddrManager
 {
     pub fn new(orchestrator : PeerChannel) -> AddrManager
     {
-        let mut channels = Vec::new();
+        let mut channels = Vec::with_capacity(512);
         let mut secret : [u8, ..256] = [0u8, ..256];
 
         channels.push(orchestrator);
@@ -96,9 +144,10 @@ impl AddrManager
 
         AddrManager
         {
-            channels:  channels,
-            addresses: Vec::from_fn(BUCKETS, |_| HashSet::new()),
-            secret: secret
+            channels:       channels,
+            addresses:      Vec::from_fn(BUCKETS, |_| HashSet::new()),
+            addrs_per_peer: HashMap::with_capacity(512),
+            secret:         secret
         }
     }
 
@@ -136,51 +185,114 @@ impl AddrManager
         (::crypto::hash_first_u32(data.as_slice()) as uint)%BUCKETS
     }
 
-    fn add_address(&mut self, addr : NetAddr)
+    fn bucket_cleanup(&mut self, bucket : uint)
+    {
+        let mut to_remove : Vec<Address> = Vec::new();
+
+        // TODO make this not aweful
+        for addr in self.addresses[bucket].iter()
+        {
+            if ::crypto::rand_interval(0,8) == 0
+            {
+                to_remove.push(*addr);
+            }
+        }
+
+        for addr in to_remove.iter()
+        {
+            self.addresses.get_mut(bucket).remove(addr);
+            self.dec_peer_addresses(&addr.peer);
+        }
+
+        println!("bucket cleanup: dropped {} addresses",to_remove.len());
+    }
+
+    fn add_address(&mut self, peer : &IpAddr, addr : NetAddr)
     {
         let bucket : uint = self.get_bucket_idx(&addr);
+        let address : Address = Address::new(addr,peer.clone());
+        let new_addr : bool;
+
+        assert!(self.allow_peer_to_add(peer));
 
         println!("bucket: {}",bucket);
 
-        self.addresses.get_mut(bucket).insert(addr);
+        new_addr = self.addresses.get_mut(bucket).insert(address);
+
+        if new_addr
+        {
+            self.inc_peer_addresses(peer);
+        }
 
         if self.addresses[bucket].len() > MAX_ADDRESSES/BUCKETS
         {
-            let mut to_remove : Vec<NetAddr> = Vec::new();
-
-            // TODO make this not aweful
-            for addr in self.addresses[bucket].iter()
-            {
-                if ::crypto::rand_interval(0,10) == 0
-                {
-                    to_remove.push(*addr);
-                }
-            }
-
-            for addr in to_remove.iter()
-            {
-                self.addresses.get_mut(bucket).remove(addr);
-            }
-
-            println!("bucket cleanup: dropped {} addresses",to_remove.len());
+            self.bucket_cleanup(bucket);
         }
 
         ::logger::log_addr_mng(format!("addresses: {}",
                                        self.addresses.iter()
                                                      .map(|b| b.len())
-                                                     .collect::<Vec<uint>>()
-                                       ).as_slice());
+                                                     .collect::<Vec<uint>>())
+                                                     .as_slice());
         ::logger::log_addr_mng(format!("addresses size: {}",
                                        self.addresses.iter()
                                                      .map(|b| b.len())
-                                       .sum()).as_slice());
+                                                     .sum()).as_slice());
     }
 
-    fn handle_add_addresses(&mut self, addrs : Vec<NetAddr>)
+    fn inc_peer_addresses(&mut self, peer : &IpAddr)
+    {
+        let num : uint;
+
+        if !self.addrs_per_peer.contains_key(peer)
+        {
+            self.addrs_per_peer.insert(*peer,0);
+        }
+
+        num = *self.addrs_per_peer.find(peer).unwrap() + 1;
+
+        self.addrs_per_peer.insert(*peer,num);
+    }
+
+
+    fn dec_peer_addresses(&mut self, peer : &IpAddr)
+    {
+        let num : uint;
+
+        assert!(self.addrs_per_peer.contains_key(peer));
+
+        num = *self.addrs_per_peer.find(peer).unwrap() - 1;
+
+        if num == 0
+        {
+            self.addrs_per_peer.insert(*peer,num);
+        }
+        else
+        {
+            self.addrs_per_peer.remove(peer);
+        }
+    }
+
+    fn allow_peer_to_add(&self, peer : &IpAddr) -> bool
+    {
+        match self.addrs_per_peer.find(peer)
+        {
+            Some(num) =>
+                *num <= (MAX_ADDRS_PER_PEER_PERCENT*(MAX_ADDRESSES as f32)) as uint,
+            None      => true
+        }
+    }
+
+    fn handle_add_addresses(&mut self, peer : IpAddr, addrs : Vec<NetAddr>)
     {
         for addr in addrs.iter().filter(|addr| addr.is_valid_addr())
         {
-            self.add_address(*addr);
+            if !self.allow_peer_to_add(&peer)
+            {
+                break;
+            }
+
+            self.add_address(&peer,*addr);
         }
     }
 
@@ -197,8 +309,8 @@ impl AddrManager
         for _ in range(0,5*num)
         {
             let bucket = ::crypto::rand_interval(0,BUCKETS-1);
-            let amount = ::crypto::rand_interval(3,6); // TODO XXX contants?
-            let mut candidates : Vec<&NetAddr>;
+            let amount = ::crypto::rand_interval(2,4); // TODO constants?
+            let mut candidates : Vec<&Address>;
 
             if addrs.len() >= num
             {
@@ -211,7 +323,7 @@ impl AddrManager
 
             for addr in candidates.iter().take(amount)
             {
-                addrs.push(*addr.clone());
+                addrs.push(addr.netaddr.clone());
             }
         }
 
@@ -229,7 +341,8 @@ impl AddrManager
 
         match request
         {
-            AddrMngAddAddresses(addrs) => self.handle_add_addresses(addrs),
+            AddrMngAddAddresses(peer,addrs) =>
+                self.handle_add_addresses(peer,addrs),
             AddrMngGetAddresses        => self.handle_get_addrs(channelid),
             AddrMngAddPeerChannel(s,r) => self.handle_add_channel((s,r))
         }
@@ -302,6 +415,7 @@ impl AddrManager
 }
 
 /* Goals:
+ *
  * 1. Only keep a limited number of addresses.
  * 2. Keep addresses fresh.
  * 3. Make sure no single attacker can fill the entire table.
@@ -329,6 +443,5 @@ impl AddrManager
  *
  * * (2) Drop old addresses (with >= X hrs)
  *       * (1,2) To drop addresses select older
- * * (3) Any peer cannot have more than X% of the addrs added by him
  * * (5) Keep a small pool of tried addresses and serve at least X of them.
  */
