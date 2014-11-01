@@ -28,6 +28,7 @@ use self::sync::comm::Empty;
 use self::sync::comm::Disconnected;
 
 use datatype::netaddr::NetAddr;
+use crypto::rand_interval;
 
 pub static ADDRMNG_CHANNEL_BUF_CAP : uint = 8;
 
@@ -36,8 +37,11 @@ static BUCKETS : uint = 64;
 
 static MAX_ADDRS_PER_PEER_PERCENT : f32 = 0.02;
 
-static ANNOUNCE_ADDRS_MIN : uint = 10;
-static ANNOUNCE_ADDRS_MAX : uint = 50;
+static ANNOUNCE_SOME_ADDRS_MIN : uint = 5;
+static ANNOUNCE_SOME_ADDRS_MAX : uint = 25;
+
+static ANNOUNCE_MANY_ADDRS_MIN : uint = 200;
+static ANNOUNCE_MANY_ADDRS_MAX : uint = 500;
 
 pub type AddrManagerChannel
     = (SyncSender<AddrManagerRequest>, Receiver<AddrManagerReply>);
@@ -50,7 +54,8 @@ pub enum AddrManagerRequest
     AddrMngAddAddresses(IpAddr, Vec<NetAddr>),
     AddrMngAddPeerChannel(SyncSender<AddrManagerReply>,
                           Receiver<AddrManagerRequest>),
-    AddrMngGetAddresses
+    AddrMngGetSomeAddresses,
+    AddrMngGetManyAddresses
 }
 
 pub enum AddrManagerReply
@@ -68,8 +73,10 @@ impl Show for AddrManagerRequest
                 write!(f,"{}: Adds Addresses: {}",peer,addrs),
             AddrMngAddPeerChannel(_,_) =>
                 write!(f,"New channel"),
-            AddrMngGetAddresses =>
-                write!(f,"Addresses request")
+            AddrMngGetSomeAddresses =>
+                write!(f,"Some addresses request"),
+            AddrMngGetManyAddresses =>
+                write!(f,"Many addresses request")
         }
     }
 }
@@ -192,7 +199,7 @@ impl AddrManager
         // TODO make this not aweful
         for addr in self.addresses[bucket].iter()
         {
-            if ::crypto::rand_interval(0,8) == 0
+            if rand_interval(0,8) == 0
             {
                 to_remove.push(*addr);
             }
@@ -254,7 +261,6 @@ impl AddrManager
         self.addrs_per_peer.insert(*peer,num);
     }
 
-
     fn dec_peer_addresses(&mut self, peer : &IpAddr)
     {
         let num : uint;
@@ -263,7 +269,7 @@ impl AddrManager
 
         num = *self.addrs_per_peer.find(peer).unwrap() - 1;
 
-        if num == 0
+        if num > 0
         {
             self.addrs_per_peer.insert(*peer,num);
         }
@@ -301,21 +307,23 @@ impl AddrManager
         self.channels.push(channel);
     }
 
-    fn handle_get_addrs(&self, channelid : uint)
+    fn get_addrs(&self, num : uint) -> Vec<NetAddr>
     {
-        let num = ::crypto::rand_interval(ANNOUNCE_ADDRS_MIN,ANNOUNCE_ADDRS_MAX);
         let mut addrs : Vec<NetAddr> = Vec::with_capacity(num);
 
         for _ in range(0,5*num)
         {
-            let bucket = ::crypto::rand_interval(0,BUCKETS-1);
-            let amount = ::crypto::rand_interval(2,4); // TODO constants?
+            let bucket = rand_interval(0,BUCKETS-1);
+            let left   = addrs.len()-num;
+            let amount = ::std::cmp::min(left,rand_interval(2,4));
             let mut candidates : Vec<&Address>;
 
             if addrs.len() >= num
             {
                 break;
             }
+
+            assert!(amount > 0);
 
             candidates=self.addresses[bucket].iter().collect();
 
@@ -330,6 +338,28 @@ impl AddrManager
         /* Shuffle addrs to minimize the bucket-related information leaked */
         ::crypto::rng().shuffle(addrs.as_mut_slice());
 
+        addrs
+    }
+
+    fn handle_get_some_addrs(&self, channelid : uint)
+    {
+        let num;
+        let addrs;
+
+        num = rand_interval(ANNOUNCE_SOME_ADDRS_MIN,ANNOUNCE_SOME_ADDRS_MAX);
+        addrs = self.get_addrs(num);
+
+        self.send(channelid,AddrMngAddresses(addrs));
+    }
+
+    fn handle_get_many_addrs(&self, channelid : uint)
+    {
+        let num;
+        let addrs;
+
+        num = rand_interval(ANNOUNCE_MANY_ADDRS_MIN,ANNOUNCE_MANY_ADDRS_MAX);
+        addrs = self.get_addrs(num);
+
         self.send(channelid,AddrMngAddresses(addrs));
     }
 
@@ -343,7 +373,8 @@ impl AddrManager
         {
             AddrMngAddAddresses(peer,addrs) =>
                 self.handle_add_addresses(peer,addrs),
-            AddrMngGetAddresses        => self.handle_get_addrs(channelid),
+            AddrMngGetSomeAddresses    => self.handle_get_some_addrs(channelid),
+            AddrMngGetManyAddresses    => self.handle_get_many_addrs(channelid),
             AddrMngAddPeerChannel(s,r) => self.handle_add_channel((s,r))
         }
     }

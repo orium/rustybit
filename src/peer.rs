@@ -38,7 +38,8 @@ use addrmng::AddrManagerChannel;
 use addrmng::AddrManagerRequest;
 use addrmng::AddrManagerReply;
 use addrmng::AddrMngAddAddresses;
-use addrmng::AddrMngGetAddresses;
+use addrmng::AddrMngGetSomeAddresses;
+use addrmng::AddrMngGetManyAddresses;
 use addrmng::AddrMngAddresses;
 
 macro_rules! some_ref_or(
@@ -380,16 +381,22 @@ impl Peer
 
     fn handle_getaddr(&mut self, getaddr : GetAddr) -> Result<(),PeerError>
     {
-        try!(self.announce_addresses());
+        try!(self.announce_addresses(true));
 
         ::logger::log_received_msg(&self.addr,&MsgGetAddr(getaddr));
 
         Ok(())
     }
 
-    fn announce_addresses(&mut self) -> Result<(),PeerError>
+    fn announce_addresses(&mut self, many : bool) -> Result<(),PeerError>
     {
-        let reply = self.addr_mng_send_recv(AddrMngGetAddresses);
+        let request : AddrManagerRequest;
+        let reply   : AddrManagerReply;
+
+        request = if many { AddrMngGetManyAddresses }
+                  else { AddrMngGetSomeAddresses };
+
+        reply = self.addr_mng_send_recv(request);
 
         match reply
         {
@@ -430,7 +437,7 @@ impl Peer
 
     fn periodic_announce_addrs(&mut self) -> Result<(),PeerError>
     {
-        self.announce_addresses()
+        self.announce_addresses(false)
     }
 
     fn periodic_request_addrs(&mut self) -> Result<(),PeerError>
