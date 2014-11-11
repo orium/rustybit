@@ -12,11 +12,10 @@ use std::io::net::ip::SocketAddr;
 use std::io::net::ip::IpAddr;
 use std::io::net::ip::Ipv4Addr;
 use std::io::net::ip::Ipv6Addr;
-
+use std::io::Timer;
+use std::time::duration::Duration;
 use std::iter::AdditiveIterator;
-
 use std::rand::Rng;
-
 use std::comm::Handle;
 use std::collections::HashSet;
 use std::collections::HashMap;
@@ -35,13 +34,21 @@ pub static ADDRMNG_CHANNEL_BUF_CAP : uint = 8;
 static MAX_ADDRESSES : uint = 2500;
 static BUCKETS : uint = 64;
 
-static MAX_ADDRS_PER_PEER_PERCENT : f32 = 0.02;
+static MAX_ADDRS_PER_PEER : uint = (0.02*(MAX_ADDRESSES as f32)) as uint;
+static MAX_ADDRS_PER_BUCKET : uint = MAX_ADDRESSES/BUCKETS;
+
+/* Number of elemets in a bucket that will trigger a cleanup
+ * (in periodic_cleanup())
+ */
+static BUCKET_CLEANUP_OCCUPIED : uint = (0.80*(MAX_ADDRS_PER_BUCKET as f32)) as uint;
 
 static ANNOUNCE_SOME_ADDRS_MIN : uint = 5;
 static ANNOUNCE_SOME_ADDRS_MAX : uint = 25;
 
 static ANNOUNCE_MANY_ADDRS_MIN : uint = 200;
 static ANNOUNCE_MANY_ADDRS_MAX : uint = 500;
+
+static PERIODIC_CLEANUP_M : uint = 20;
 
 pub type AddrManagerChannel
     = (SyncSender<AddrManagerRequest>, Receiver<AddrManagerReply>);
@@ -126,9 +133,7 @@ impl PartialEq for Address
     }
 }
 
-impl Eq for Address
-{
-}
+impl Eq for Address {}
 
 pub struct AddrManager
 {
@@ -199,7 +204,7 @@ impl AddrManager
         // TODO make this not aweful
         for addr in self.addresses[bucket].iter()
         {
-            if rand_interval(0,8) == 0
+            if rand_interval(0,5) == 0
             {
                 to_remove.push(*addr);
             }
@@ -222,6 +227,11 @@ impl AddrManager
 
         assert!(self.allow_peer_to_add(peer));
 
+        if self.addresses[bucket].len() > MAX_ADDRS_PER_BUCKET
+        {
+            return;
+        }
+
         println!("bucket: {}",bucket);
 
         new_addr = self.addresses.get_mut(bucket).insert(address);
@@ -231,17 +241,12 @@ impl AddrManager
             self.inc_peer_addresses(peer);
         }
 
-        if self.addresses[bucket].len() > MAX_ADDRESSES/BUCKETS
-        {
-            self.bucket_cleanup(bucket);
-        }
-
         ::logger::log_addr_mng(format!("addresses: {}",
                                        self.addresses.iter()
                                                      .map(|b| b.len())
                                                      .collect::<Vec<uint>>())
                                                      .as_slice());
-        ::logger::log_addr_mng(format!("addresses size: {}",
+        ::logger::log_addr_mng(format!("number of addresses: {}",
                                        self.addresses.iter()
                                                      .map(|b| b.len())
                                                      .sum()).as_slice());
@@ -283,14 +288,16 @@ impl AddrManager
     {
         match self.addrs_per_peer.find(peer)
         {
-            Some(num) =>
-                *num <= (MAX_ADDRS_PER_PEER_PERCENT*(MAX_ADDRESSES as f32)) as uint,
+            Some(num) => *num <= MAX_ADDRS_PER_PEER,
             None      => true
         }
     }
 
     fn handle_add_addresses(&mut self, peer : IpAddr, addrs : Vec<NetAddr>)
     {
+
+        /* TODO: even if we cannot add a new addr, we should update it
+         */
         for addr in addrs.iter().filter(|addr| addr.is_valid_addr())
         {
             if !self.allow_peer_to_add(&peer)
@@ -379,16 +386,17 @@ impl AddrManager
         }
     }
 
-    fn wait(&self)
+    fn wait(&self, periodic : &Receiver<()>)
     {
         let sel : Select;
         let mut handlers : Vec<Handle<AddrManagerRequest>>;
-        let cap;
+        let mut periodic_handler : Handle<()>;
+        let cap : uint;
 
         sel = Select::new();
         /* This really needed with_capacity().  See the unsafe block bellow.
          */
-        handlers = Vec::with_capacity(self.channels.len());
+        handlers = Vec::with_capacity(self.channels.len()+1);
 
         cap = handlers.capacity();
 
@@ -410,6 +418,9 @@ impl AddrManager
             unsafe { handlers.last_mut().unwrap().add(); }
         }
 
+        periodic_handler = sel.handle(periodic);
+        unsafe { periodic_handler.add(); }
+
         sel.wait();
 
         for handler in handlers.iter_mut()
@@ -418,11 +429,45 @@ impl AddrManager
         }
     }
 
+    pub fn periodic_cleanup(&mut self)
+    {
+        ::logger::log_addr_mng(format!("Before periodic cleanup addresses: {}",
+                                       self.addresses.iter()
+                                       .map(|b| b.len())
+                                       .sum())
+                               .as_slice());
+
+        for i in range(0,BUCKETS)
+        {
+            if self.addresses[i].len() > BUCKET_CLEANUP_OCCUPIED
+            {
+                self.bucket_cleanup(i);
+            }
+        }
+
+        ::logger::log_addr_mng(format!("After periodic cleanup addresses: {}",
+                                       self.addresses.iter()
+                                       .map(|b| b.len())
+                                       .sum())
+                               .as_slice());
+
+    }
+
     pub fn read_loop(&mut self)
     {
+        let mut cleanup_timer : Timer = Timer::new().unwrap();
+        let cleanup_periodic : Receiver<()>;
+
+        cleanup_periodic = cleanup_timer.periodic(Duration::minutes(PERIODIC_CLEANUP_M as i64));
+
         loop
         {
-            self.wait();
+            self.wait(&cleanup_periodic);
+
+            if cleanup_periodic.try_recv().is_ok()
+            {
+                self.periodic_cleanup();
+            }
 
             for i in range(0,self.channels.len())
             {
