@@ -257,14 +257,18 @@ impl Peer
         receiver.recv()
     }
 
+    /* TODO we should call this periodically */
     fn addr_mng_add_self(&self)
     {
         let mut singleton_addrs : Vec<NetAddr> = Vec::with_capacity(1);
-        let addr : NetAddr;
+        let mut addr : NetAddr;
+        let now : Timespec = time::now_utc().to_timespec();
 
         assert!(self.version.is_some());
 
         addr = self.version.as_ref().unwrap().get_addr_send().clone();
+
+        addr.time = Some(now);
 
         singleton_addrs.push(addr);
 

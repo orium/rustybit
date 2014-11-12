@@ -1,4 +1,5 @@
 extern crate sync;
+extern crate time;
 
 use std::fmt::Show;
 use std::fmt::Formatter;
@@ -20,6 +21,8 @@ use std::comm::Handle;
 use std::collections::HashSet;
 use std::collections::HashMap;
 
+use self::time::Timespec;
+
 use self::sync::comm::Receiver;
 use self::sync::comm::SyncSender;
 use self::sync::comm::Select;
@@ -37,11 +40,6 @@ static BUCKETS : uint = 64;
 static MAX_ADDRS_PER_PEER : uint = (0.02*(MAX_ADDRESSES as f32)) as uint;
 static MAX_ADDRS_PER_BUCKET : uint = MAX_ADDRESSES/BUCKETS;
 
-/* Number of elemets in a bucket that will trigger a cleanup
- * (in periodic_cleanup())
- */
-static BUCKET_CLEANUP_OCCUPIED : uint = (0.80*(MAX_ADDRS_PER_BUCKET as f32)) as uint;
-
 static ANNOUNCE_SOME_ADDRS_MIN : uint = 5;
 static ANNOUNCE_SOME_ADDRS_MAX : uint = 25;
 
@@ -49,6 +47,7 @@ static ANNOUNCE_MANY_ADDRS_MIN : uint = 200;
 static ANNOUNCE_MANY_ADDRS_MAX : uint = 500;
 
 static PERIODIC_CLEANUP_M : uint = 20;
+static OLD_ADDRESS_AGE_M : uint = 4*60;
 
 pub type AddrManagerChannel
     = (SyncSender<AddrManagerRequest>, Receiver<AddrManagerReply>);
@@ -114,6 +113,18 @@ impl Address
             peer:    peer,
             netaddr: netaddr
         }
+    }
+
+    pub fn is_old(&self) -> bool
+    {
+        let now : Timespec = time::now_utc().to_timespec();
+        let age : Duration;
+
+        assert!(self.netaddr.time.is_some());
+
+        age = now-self.netaddr.time.unwrap();
+
+        age > Duration::minutes(OLD_ADDRESS_AGE_M as i64)
     }
 }
 
@@ -201,10 +212,9 @@ impl AddrManager
     {
         let mut to_remove : Vec<Address> = Vec::new();
 
-        // TODO make this not aweful
         for addr in self.addresses[bucket].iter()
         {
-            if rand_interval(0,5) == 0
+            if addr.is_old()
             {
                 to_remove.push(*addr);
             }
@@ -219,13 +229,12 @@ impl AddrManager
         println!("bucket cleanup: dropped {} addresses",to_remove.len());
     }
 
-    fn add_address(&mut self, peer : &IpAddr, addr : NetAddr)
+    fn add_address(&mut self, address : Address)
     {
-        let bucket : uint = self.get_bucket_idx(&addr);
-        let address : Address = Address::new(addr,peer.clone());
+        let bucket : uint = self.get_bucket_idx(&address.netaddr);
         let new_addr : bool;
 
-        assert!(self.allow_peer_to_add(peer));
+        assert!(self.allow_peer_to_add(&address.peer));
 
         if self.addresses[bucket].len() > MAX_ADDRS_PER_BUCKET
         {
@@ -234,11 +243,12 @@ impl AddrManager
 
         println!("bucket: {}",bucket);
 
+        /* TODO only update if newer */
         new_addr = self.addresses.get_mut(bucket).insert(address);
 
         if new_addr
         {
-            self.inc_peer_addresses(peer);
+            self.inc_peer_addresses(&address.peer);
         }
 
         ::logger::log_addr_mng(format!("addresses: {}",
@@ -295,17 +305,23 @@ impl AddrManager
 
     fn handle_add_addresses(&mut self, peer : IpAddr, addrs : Vec<NetAddr>)
     {
-
         /* TODO: even if we cannot add a new addr, we should update it
          */
         for addr in addrs.iter().filter(|addr| addr.is_valid_addr())
         {
+            let address : Address = Address::new(*addr,peer.clone());
+
+            assert!(addr.time.is_some());
+
             if !self.allow_peer_to_add(&peer)
             {
                 break;
             }
 
-            self.add_address(&peer,*addr);
+            if !address.is_old()
+            {
+                self.add_address(address);
+            }
         }
     }
 
@@ -386,6 +402,27 @@ impl AddrManager
         }
     }
 
+    fn periodic_cleanup(&mut self)
+    {
+        ::logger::log_addr_mng(format!("Before periodic cleanup addresses: {}",
+                                       self.addresses.iter()
+                                       .map(|b| b.len())
+                                       .sum())
+                               .as_slice());
+
+        for i in range(0,BUCKETS)
+        {
+            self.bucket_cleanup(i);
+        }
+
+        ::logger::log_addr_mng(format!("After periodic cleanup addresses: {}",
+                                       self.addresses.iter()
+                                       .map(|b| b.len())
+                                       .sum())
+                               .as_slice());
+
+    }
+
     fn wait(&self, periodic : &Receiver<()>)
     {
         let sel : Select;
@@ -427,30 +464,6 @@ impl AddrManager
         {
             unsafe { handler.remove(); }
         }
-    }
-
-    pub fn periodic_cleanup(&mut self)
-    {
-        ::logger::log_addr_mng(format!("Before periodic cleanup addresses: {}",
-                                       self.addresses.iter()
-                                       .map(|b| b.len())
-                                       .sum())
-                               .as_slice());
-
-        for i in range(0,BUCKETS)
-        {
-            if self.addresses[i].len() > BUCKET_CLEANUP_OCCUPIED
-            {
-                self.bucket_cleanup(i);
-            }
-        }
-
-        ::logger::log_addr_mng(format!("After periodic cleanup addresses: {}",
-                                       self.addresses.iter()
-                                       .map(|b| b.len())
-                                       .sum())
-                               .as_slice());
-
     }
 
     pub fn read_loop(&mut self)
@@ -517,7 +530,5 @@ impl AddrManager
 
 /* TODO:
  *
- * * (2) Drop old addresses (with >= X hrs)
- *       * (1,2) To drop addresses select older
  * * (5) Keep a small pool of tried addresses and serve at least X of them.
  */
