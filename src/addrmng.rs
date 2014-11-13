@@ -18,7 +18,6 @@ use std::time::duration::Duration;
 use std::iter::AdditiveIterator;
 use std::rand::Rng;
 use std::comm::Handle;
-use std::collections::HashSet;
 use std::collections::HashMap;
 
 use self::time::Timespec;
@@ -47,7 +46,7 @@ static ANNOUNCE_MANY_ADDRS_MIN : uint = 200;
 static ANNOUNCE_MANY_ADDRS_MAX : uint = 500;
 
 static PERIODIC_CLEANUP_M : uint = 20;
-static OLD_ADDRESS_AGE_M : uint = 4*60;
+static OLD_ADDRESS_AGE_M : uint = 3*60;
 
 pub type AddrManagerChannel
     = (SyncSender<AddrManagerRequest>, Receiver<AddrManagerReply>);
@@ -98,6 +97,7 @@ impl Show for AddrManagerReply
     }
 }
 
+#[deriving(Clone)]
 struct Address
 {
     pub peer    : IpAddr,
@@ -149,7 +149,7 @@ impl Eq for Address {}
 pub struct AddrManager
 {
     channels       : Vec<PeerChannel>,
-    addresses      : Vec<HashSet<Address>>,
+    addresses      : Vec<HashMap<SocketAddr,Address>>,
     addrs_per_peer : HashMap<IpAddr,uint>,
     secret         : [u8, ..256]
 }
@@ -168,7 +168,7 @@ impl AddrManager
         AddrManager
         {
             channels:       channels,
-            addresses:      Vec::from_fn(BUCKETS, |_| HashSet::new()),
+            addresses:      Vec::from_fn(BUCKETS, |_| HashMap::new()),
             addrs_per_peer: HashMap::with_capacity(512),
             secret:         secret
         }
@@ -183,24 +183,46 @@ impl AddrManager
         sender.send(msg);
     }
 
+    #[allow(dead_code)]
+    fn is_consistent(&self) -> bool
+    {
+        for (addr, num) in self.addrs_per_peer.iter()
+        {
+            let mut num_count : uint = 0;
+
+            for bucket in self.addresses.iter()
+            {
+                num_count += bucket.iter()
+                    .filter(|&(_,a)| a.peer == *addr).count();
+            }
+
+            if num_count != *num
+            {
+                println!("Error: Inconsistency: should be {}, is {}",num_count,num);
+                return false;
+            }
+        }
+
+        true
+    }
+
     /* We only take into account the /12 subnet.
      */
-    fn get_bucket_idx(&self, addr : &NetAddr) -> uint
+    fn get_bucket_idx(&self, socketaddr : &SocketAddr) -> uint
     {
         let mut data : Vec<u8> = Vec::new();
 
         data.push_all(&self.secret);
 
-        match addr.addr
+        match *socketaddr
         {
-            Some(SocketAddr { ip: Ipv6Addr(..), port: _ }) =>
+            SocketAddr { ip: Ipv6Addr(..), port: _ } =>
                 unimplemented!(), /* TODO */
-            Some(SocketAddr { ip: Ipv4Addr(h0,h1,_,_), port: _ }) =>
+            SocketAddr { ip: Ipv4Addr(h0,h1,_,_), port: _ } =>
             {
                 data.push(h0);
                 data.push(h1&0xf0);
-            },
-            _  => unreachable!()
+            }
         }
 
         data.push_all(&self.secret);
@@ -212,44 +234,95 @@ impl AddrManager
     {
         let mut to_remove : Vec<Address> = Vec::new();
 
-        for addr in self.addresses[bucket].iter()
+        for (_, address) in self.addresses[bucket].iter()
         {
-            if addr.is_old()
+            if address.is_old()
             {
-                to_remove.push(*addr);
+                to_remove.push(*address);
             }
         }
 
-        for addr in to_remove.iter()
+        for address in to_remove.iter()
         {
-            self.addresses.get_mut(bucket).remove(addr);
-            self.dec_peer_addresses(&addr.peer);
+            let socketaddr : &SocketAddr = &address.netaddr.addr.unwrap();
+
+            self.addresses.get_mut(bucket).remove(socketaddr);
+            self.dec_peer_addresses(&address.peer);
         }
 
         println!("bucket cleanup: dropped {} addresses",to_remove.len());
     }
 
-    fn add_address(&mut self, address : Address)
+    fn get_known_address_time(&self, socketaddr : &SocketAddr) -> Option<Timespec>
     {
-        let bucket : uint = self.get_bucket_idx(&address.netaddr);
+        let bucket : uint = self.get_bucket_idx(socketaddr);
+        let known_addr : Option<&Address>;
+
+        known_addr = self.addresses[bucket].find(socketaddr);
+
+        known_addr.map(|address| address.netaddr.time.unwrap())
+    }
+
+    fn update_address_timestamp(&mut self, address : Address)
+    {
+        let socketaddr : &SocketAddr = &address.netaddr.addr.unwrap();
+        let bucket : uint = self.get_bucket_idx(socketaddr);
+        let old : Address;
         let new_addr : bool;
 
-        assert!(self.allow_peer_to_add(&address.peer));
+        /* We might be changing the peer of the address */
+        old = self.addresses[bucket].find(socketaddr).unwrap().clone();
+        self.dec_peer_addresses(&old.peer);
 
-        if self.addresses[bucket].len() > MAX_ADDRS_PER_BUCKET
+        assert!(old.netaddr.time.unwrap() < address.netaddr.time.unwrap());
+
+        new_addr = self.addresses.get_mut(bucket).insert(*socketaddr,address);
+        self.inc_peer_addresses(&address.peer);
+
+        ::logger::log_addr_mng(format!("updated address {} from {} to {}",
+                                       socketaddr,
+                                       old.netaddr.time.unwrap().sec,
+                                       address.netaddr.time.unwrap().sec)
+                               .as_slice());
+
+        assert!(!new_addr);
+    }
+
+    fn add_address(&mut self, address : Address)
+    {
+        let socketaddr : &SocketAddr = &address.netaddr.addr.unwrap();
+        let bucket : uint = self.get_bucket_idx(socketaddr);
+        let known_addr_time : Option<time::Timespec>;
+        let new_addr : bool;
+
+        known_addr_time = self.get_known_address_time(socketaddr);
+
+        /* Refresh known address timestamp */
+        if known_addr_time.is_some()
+        {
+            if known_addr_time.unwrap() < address.netaddr.time.unwrap()
+            {
+                self.update_address_timestamp(address);
+            }
+
+            return;
+        }
+
+        if !self.allow_peer_to_add(&address.peer)
+            || self.addresses[bucket].len() > MAX_ADDRS_PER_BUCKET
         {
             return;
         }
 
         println!("bucket: {}",bucket);
 
-        /* TODO only update if newer */
-        new_addr = self.addresses.get_mut(bucket).insert(address);
+        assert!(known_addr_time.is_none());
+        assert!(!address.is_old());
 
-        if new_addr
-        {
-            self.inc_peer_addresses(&address.peer);
-        }
+        new_addr = self.addresses.get_mut(bucket).insert(*socketaddr,address);
+        self.inc_peer_addresses(&address.peer);
+
+        assert!(new_addr);
 
         ::logger::log_addr_mng(format!("addresses: {}",
                                        self.addresses.iter()
@@ -290,6 +363,7 @@ impl AddrManager
         }
         else
         {
+            assert!(num == 0);
             self.addrs_per_peer.remove(peer);
         }
     }
@@ -305,18 +379,13 @@ impl AddrManager
 
     fn handle_add_addresses(&mut self, peer : IpAddr, addrs : Vec<NetAddr>)
     {
-        /* TODO: even if we cannot add a new addr, we should update it
+        /* TODO How about netaddr.services?
          */
         for addr in addrs.iter().filter(|addr| addr.is_valid_addr())
         {
             let address : Address = Address::new(*addr,peer.clone());
 
             assert!(addr.time.is_some());
-
-            if !self.allow_peer_to_add(&peer)
-            {
-                break;
-            }
 
             if !address.is_old()
             {
@@ -348,7 +417,7 @@ impl AddrManager
 
             assert!(amount > 0);
 
-            candidates=self.addresses[bucket].iter().collect();
+            candidates = self.addresses[bucket].values().collect();
 
             ::crypto::rng().shuffle(candidates.as_mut_slice());
 
@@ -524,11 +593,11 @@ impl AddrManager
  *       Use cryptographic key so an attacker doesn't know how to fill a
  *       specific bucket.
  * * (6) When serving ips avoid serving more that X addrs from each bucket.
- *
- * How do we judge oldness? we cannot trust peers completly.
  */
 
 /* TODO:
  *
  * * (5) Keep a small pool of tried addresses and serve at least X of them.
+ *
+ * How do we judge oldness? we cannot trust peers completly.
  */
