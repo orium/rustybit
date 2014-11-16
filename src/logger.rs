@@ -15,6 +15,7 @@ use message::MsgTx;
 use message::MsgGetAddr;
 
 use std::time::duration::Duration;
+use self::time::Timespec;
 
 enum LogFlag
 {
@@ -157,7 +158,7 @@ pub fn log_addr_mng_request(request : &::addrmng::AddrManagerRequest)
 {
     if LOG_FLAGS & LogFlagAddrMng as u64 != 0
     {
-        println!("Address Manager Request: {}",request);
+        println!("Address Manager: Request: {}",request);
     }
 }
 
@@ -165,14 +166,62 @@ pub fn log_addr_mng_reply(reply : &::addrmng::AddrManagerReply)
 {
     if LOG_FLAGS & LogFlagAddrMng as u64 != 0
     {
-        println!("Address Manager Reply: {}",reply);
+        println!("Address Manager: Reply: {}",reply);
     }
 }
 
-pub fn log_addr_mng(str : &str)
+pub fn log_addr_mng_disconnect()
 {
     if LOG_FLAGS & LogFlagAddrMng as u64 != 0
     {
-        println!("Address Manager: {}",str);
+        println!("Address Manager: Channel disconnected");
+    }
+}
+
+pub fn log_addr_mng_buckets<T : Iterator<uint>>(buckets : &mut T)
+{
+    if LOG_FLAGS & LogFlagAddrMng as u64 != 0
+    {
+        let mut count : uint = 0;
+
+        for b in *buckets
+        {
+            if count%8 == 0
+            {
+                if count > 0 { println!(""); }
+                print!("Address Manager: Buckets {}:",count/8);
+            }
+
+            print!(" {:2}",b);
+            count += 1;
+        }
+
+        println!("");
+    }
+}
+
+pub fn log_addr_mng_timestamp_update(addr : &SocketAddr,
+                                     old : &Timespec,
+                                     new : &Timespec)
+{
+    if LOG_FLAGS & LogFlagAddrMng as u64 != 0
+    {
+        println!("Address Manager: Updated address {} from {} to {}",addr,old,new);
+    }
+}
+
+pub fn log_addr_mng_address_count(count : uint)
+{
+    if LOG_FLAGS & LogFlagAddrMng as u64 != 0
+    {
+        println!("Address Manager: Address count: {}",count);
+    }
+}
+
+pub fn log_addr_mng_cleanup(count_before : uint, count_after : uint)
+{
+    if LOG_FLAGS & LogFlagAddrMng as u64 != 0
+    {
+        println!("Address Manager: Cleanup: {} -> {}",count_before,count_after);
     }
 }

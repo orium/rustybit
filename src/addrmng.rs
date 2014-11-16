@@ -206,6 +206,11 @@ impl AddrManager
         true
     }
 
+    fn address_count(&self) -> uint
+    {
+        self.addresses.iter().map(|b| b.len()).sum()
+    }
+
     /* We only take into account the /12 subnet.
      */
     fn get_bucket_idx(&self, socketaddr : &SocketAddr) -> uint
@@ -249,8 +254,6 @@ impl AddrManager
             self.addresses.get_mut(bucket).remove(socketaddr);
             self.dec_peer_addresses(&address.peer);
         }
-
-        println!("bucket cleanup: dropped {} addresses",to_remove.len());
     }
 
     fn get_known_address_time(&self, socketaddr : &SocketAddr) -> Option<Timespec>
@@ -279,12 +282,9 @@ impl AddrManager
         new_addr = self.addresses.get_mut(bucket).insert(*socketaddr,address);
         self.inc_peer_addresses(&address.peer);
 
-        ::logger::log_addr_mng(format!("updated address {} from {} to {}",
-                                       socketaddr,
-                                       old.netaddr.time.unwrap().sec,
-                                       address.netaddr.time.unwrap().sec)
-                               .as_slice());
-
+        ::logger::log_addr_mng_timestamp_update(&address.netaddr.addr.unwrap(),
+                                                &old.netaddr.time.unwrap(),
+                                                &address.netaddr.time.unwrap());
         assert!(!new_addr);
     }
 
@@ -314,8 +314,6 @@ impl AddrManager
             return;
         }
 
-        println!("bucket: {}",bucket);
-
         assert!(known_addr_time.is_none());
         assert!(!address.is_old());
 
@@ -324,15 +322,8 @@ impl AddrManager
 
         assert!(new_addr);
 
-        ::logger::log_addr_mng(format!("addresses: {}",
-                                       self.addresses.iter()
-                                                     .map(|b| b.len())
-                                                     .collect::<Vec<uint>>())
-                                                     .as_slice());
-        ::logger::log_addr_mng(format!("number of addresses: {}",
-                                       self.addresses.iter()
-                                                     .map(|b| b.len())
-                                                     .sum()).as_slice());
+        ::logger::log_addr_mng_buckets(&mut self.addresses.iter().map(|b| b.len()));
+        ::logger::log_addr_mng_address_count(self.address_count());
     }
 
     fn inc_peer_addresses(&mut self, peer : &IpAddr)
@@ -473,23 +464,14 @@ impl AddrManager
 
     fn periodic_cleanup(&mut self)
     {
-        ::logger::log_addr_mng(format!("Before periodic cleanup addresses: {}",
-                                       self.addresses.iter()
-                                       .map(|b| b.len())
-                                       .sum())
-                               .as_slice());
+        let before : uint = self.address_count();
 
         for i in range(0,BUCKETS)
         {
             self.bucket_cleanup(i);
         }
 
-        ::logger::log_addr_mng(format!("After periodic cleanup addresses: {}",
-                                       self.addresses.iter()
-                                       .map(|b| b.len())
-                                       .sum())
-                               .as_slice());
-
+        ::logger::log_addr_mng_cleanup(before,self.address_count());
     }
 
     fn wait(&self, periodic : &Receiver<()>)
@@ -561,7 +543,7 @@ impl AddrManager
                     Err(Empty)        => (),
                     Err(Disconnected) =>
                     {
-                        ::logger::log_addr_mng("disconnected");
+                        ::logger::log_addr_mng_disconnect();
 
                         self.channels.remove(i);
                         break;
