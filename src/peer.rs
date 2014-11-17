@@ -38,7 +38,8 @@ use addrmng::AddrManagerChannel;
 use addrmng::AddrManagerRequest;
 use addrmng::AddrManagerReply;
 use addrmng::AddrMngAddAddresses;
-use addrmng::AddrMngGetAddresses;
+use addrmng::AddrMngGetSomeAddresses;
+use addrmng::AddrMngGetManyAddresses;
 use addrmng::AddrMngAddresses;
 
 macro_rules! some_ref_or(
@@ -256,20 +257,24 @@ impl Peer
         receiver.recv()
     }
 
+    /* TODO we should call this periodically */
     fn addr_mng_add_self(&self)
     {
         let mut singleton_addrs : Vec<NetAddr> = Vec::with_capacity(1);
-        let addr : NetAddr;
+        let mut addr : NetAddr;
+        let now : Timespec = time::now_utc().to_timespec();
 
         assert!(self.version.is_some());
 
         addr = self.version.as_ref().unwrap().get_addr_send().clone();
 
+        addr.time = Some(now);
+
         singleton_addrs.push(addr);
 
         if addr.is_valid_addr()
         {
-            self.addr_mng_send(AddrMngAddAddresses(singleton_addrs));
+            self.addr_mng_send(AddrMngAddAddresses(self.addr.ip,singleton_addrs));
         }
     }
 
@@ -338,7 +343,8 @@ impl Peer
     {
         let now : Timespec = time::now_utc().to_timespec();
 
-        self.addr_mng_send(AddrMngAddAddresses(addr.get_addresses().clone()));
+        self.addr_mng_send(AddrMngAddAddresses(self.addr.ip,
+                                               addr.get_addresses().clone()));
 
         self.last_addr = Some(now);
 
@@ -379,16 +385,22 @@ impl Peer
 
     fn handle_getaddr(&mut self, getaddr : GetAddr) -> Result<(),PeerError>
     {
-        try!(self.announce_addresses());
+        try!(self.announce_addresses(true));
 
         ::logger::log_received_msg(&self.addr,&MsgGetAddr(getaddr));
 
         Ok(())
     }
 
-    fn announce_addresses(&mut self) -> Result<(),PeerError>
+    fn announce_addresses(&mut self, many : bool) -> Result<(),PeerError>
     {
-        let reply = self.addr_mng_send_recv(AddrMngGetAddresses);
+        let request : AddrManagerRequest;
+        let reply   : AddrManagerReply;
+
+        request = if many { AddrMngGetManyAddresses }
+                  else { AddrMngGetSomeAddresses };
+
+        reply = self.addr_mng_send_recv(request);
 
         match reply
         {
@@ -429,7 +441,7 @@ impl Peer
 
     fn periodic_announce_addrs(&mut self) -> Result<(),PeerError>
     {
-        self.announce_addresses()
+        self.announce_addresses(false)
     }
 
     fn periodic_request_addrs(&mut self) -> Result<(),PeerError>

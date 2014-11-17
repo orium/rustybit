@@ -152,6 +152,9 @@ fn run_peers()
     /* Loop while we occasionally add more peers */
     loop
     {
+        /* TODO We should at least try to get a few peers for the same
+         * /12 subnetwork, to reduce latency.
+         */
         sleep(Duration::seconds(60)); // XXX TODO
     }
 }

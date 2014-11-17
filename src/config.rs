@@ -21,14 +21,14 @@ pub static PROTOCOL_VERSION_MIN : u32 = 70002;
 pub enum Service
 {
     NoService   = 0,
-    NodeNetwork = 1 << 0,
+    NodeNetwork = 1
 }
 
 pub type Services = u64;
 
 pub static SERVICES : Services = NodeNetwork as Services;
 
-pub static INITIAL_DISCOVERY_PEERS : uint = 20;
+pub static INITIAL_DISCOVERY_PEERS : uint = 30;
 
 pub static DEFAULT_PORT : u16 = 8333;
 
