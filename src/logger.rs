@@ -206,7 +206,8 @@ pub fn log_addr_mng_timestamp_update(addr : &SocketAddr,
 {
     if LOG_FLAGS & LogFlagAddrMng as u64 != 0
     {
-        println!("Address Manager: Updated address {} from {} to {}",addr,old,new);
+        println!("Address Manager: Updated address {} from {} to {}",
+                 addr,old.sec,new.sec);
     }
 }
 
