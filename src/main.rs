@@ -10,7 +10,7 @@ use std::time::duration::Duration;
 use getopts::optflag;
 use peerdiscovery::discover_peers;
 
-use sync::comm::sync_channel;
+use comm::DuplexChannel;
 
 use addrmng::AddrManagerChannel;
 use addrmng::AddrManager;
@@ -22,6 +22,7 @@ mod config;
 mod datatype;
 mod marshalling;
 mod crypto;
+mod comm;
 mod msgbuffer;
 mod message;
 mod logger;
@@ -112,13 +113,13 @@ fn spawn_thread_run_peer(address      : SocketAddr,
     });
 }
 
-fn spawn_thread_run_address_manager(sender   : SyncSender<AddrManagerReply>,
-                                    receiver : Receiver<AddrManagerRequest>)
+fn spawn_thread_run_address_manager(orchestrator : DuplexChannel<AddrManagerReply,
+                                                                 AddrManagerRequest>)
 {
     spawn(proc() {
         let mut addr_mng : AddrManager;
 
-        addr_mng = AddrManager::new((sender,receiver));
+        addr_mng = AddrManager::new(orchestrator);
 
         addr_mng.read_loop();
     });
@@ -127,8 +128,8 @@ fn spawn_thread_run_address_manager(sender   : SyncSender<AddrManagerReply>,
 fn run_peers()
 {
     let mut addrs : Vec<SocketAddr>;
-    let (send_our, recv_addrmng) = sync_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
-    let (send_addrmng, _recv_our) = sync_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
+    let (channel_us, channel_addrmng)
+        = comm::sync_duplex_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
 
     addrs = discover_peers(config::INITIAL_DISCOVERY_PEERS);
 
@@ -137,16 +138,16 @@ fn run_peers()
     addrs.push(SocketAddr { ip: std::io::net::ip::Ipv4Addr(192,168,1,2), port: 8333 });
     addrs.reverse();
 
-    spawn_thread_run_address_manager(send_addrmng,recv_addrmng);
+    spawn_thread_run_address_manager(channel_addrmng);
 
     for addrs in addrs.iter()
     {
-        let (send_c, recv_s) = sync_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
-        let (send_s, recv_c) = sync_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
+        let (channel_peer, channel_addrmng)
+            = comm::sync_duplex_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
 
-        send_our.send(AddrMngAddPeerChannel(send_s,recv_s));
+        channel_us.sender.send(AddrMngAddPeerChannel(channel_addrmng));
 
-        spawn_thread_run_peer(*addrs,(send_c,recv_c));
+        spawn_thread_run_peer(*addrs,channel_peer);
     }
 
     /* Loop while we occasionally add more peers */

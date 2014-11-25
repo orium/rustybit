@@ -23,13 +23,13 @@ use std::collections::HashMap;
 use self::time::Timespec;
 
 use self::sync::comm::Receiver;
-use self::sync::comm::SyncSender;
 use self::sync::comm::Select;
 use self::sync::comm::Empty;
 use self::sync::comm::Disconnected;
 
 use datatype::netaddr::NetAddr;
 use crypto::rand_interval;
+use comm::DuplexChannel;
 
 pub static ADDRMNG_CHANNEL_BUF_CAP : uint = 8;
 
@@ -48,17 +48,14 @@ static ANNOUNCE_MANY_ADDRS_MAX : uint = 500;
 static PERIODIC_CLEANUP_M : uint = 20;
 static OLD_ADDRESS_AGE_M : uint = 3*60;
 
-pub type AddrManagerChannel
-    = (SyncSender<AddrManagerRequest>, Receiver<AddrManagerReply>);
+pub type AddrManagerChannel = DuplexChannel<AddrManagerRequest,AddrManagerReply>;
 
-type PeerChannel
-    = (SyncSender<AddrManagerReply>, Receiver<AddrManagerRequest>);
+type PeerChannel = DuplexChannel<AddrManagerReply,AddrManagerRequest>;
 
 pub enum AddrManagerRequest
 {
     AddrMngAddAddresses(IpAddr, Vec<NetAddr>),
-    AddrMngAddPeerChannel(SyncSender<AddrManagerReply>,
-                          Receiver<AddrManagerRequest>),
+    AddrMngAddPeerChannel(PeerChannel),
     AddrMngGetSomeAddresses,
     AddrMngGetManyAddresses
 }
@@ -76,7 +73,7 @@ impl Show for AddrManagerRequest
         {
             AddrMngAddAddresses(ref peer, ref addrs) =>
                 write!(f,"{}: Adds Addresses: {}",peer,addrs),
-            AddrMngAddPeerChannel(_,_) =>
+            AddrMngAddPeerChannel(_) =>
                 write!(f,"New channel"),
             AddrMngGetSomeAddresses =>
                 write!(f,"Some addresses request"),
@@ -176,11 +173,9 @@ impl AddrManager
 
     fn send(&self, channelid : uint, msg : AddrManagerReply)
     {
-        let (ref sender, _) = self.channels[channelid];
-
         ::logger::log_addr_mng_reply(&msg);
 
-        sender.send(msg);
+        self.channels[channelid].sender.send(msg);
     }
 
     #[allow(dead_code)]
@@ -456,9 +451,9 @@ impl AddrManager
         {
             AddrMngAddAddresses(peer,addrs) =>
                 self.handle_add_addresses(peer,addrs),
-            AddrMngGetSomeAddresses    => self.handle_get_some_addrs(channelid),
-            AddrMngGetManyAddresses    => self.handle_get_many_addrs(channelid),
-            AddrMngAddPeerChannel(s,r) => self.handle_add_channel((s,r))
+            AddrMngGetSomeAddresses  => self.handle_get_some_addrs(channelid),
+            AddrMngGetManyAddresses  => self.handle_get_many_addrs(channelid),
+            AddrMngAddPeerChannel(c) => self.handle_add_channel(c)
         }
     }
 
@@ -491,7 +486,7 @@ impl AddrManager
         /* handlers indices must match self.clients */
         for channel in self.channels.iter()
         {
-            let (_, ref receiver) = *channel;
+            let receiver = &channel.receiver;
 
             handlers.push(sel.handle(receiver));
 
@@ -535,7 +530,7 @@ impl AddrManager
 
             for i in range(0,self.channels.len())
             {
-                let maybereq = self.channels[i].ref1().try_recv();
+                let maybereq = self.channels[i].receiver.try_recv();
 
                 match maybereq
                 {

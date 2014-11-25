@@ -243,18 +243,13 @@ impl Peer
 
     fn addr_mng_send(&self, request : AddrManagerRequest)
     {
-        let (ref sender, _) = self.addrmng_channel;
-
-        sender.send(request);
+        self.addrmng_channel.sender.send(request);
     }
 
     fn addr_mng_send_recv(&self, request : AddrManagerRequest) -> AddrManagerReply
     {
-        let (_, ref receiver) = self.addrmng_channel;
-
-        self.addr_mng_send(request);
-
-        receiver.recv()
+        self.addrmng_channel.sender.send(request);
+        self.addrmng_channel.receiver.recv()
     }
 
     /* TODO we should call this periodically */
