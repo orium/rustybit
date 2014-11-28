@@ -1,4 +1,3 @@
-extern crate sync;
 extern crate time;
 
 use std::fmt::Show;
@@ -22,31 +21,31 @@ use std::collections::HashMap;
 
 use self::time::Timespec;
 
-use self::sync::comm::Receiver;
-use self::sync::comm::Select;
-use self::sync::comm::Empty;
-use self::sync::comm::Disconnected;
+use std::comm::Receiver;
+use std::comm::Select;
+use std::comm::Empty;
+use std::comm::Disconnected;
 
 use datatype::netaddr::NetAddr;
 use crypto::rand_interval;
 use comm::DuplexChannel;
 
-pub static ADDRMNG_CHANNEL_BUF_CAP : uint = 8;
+pub const ADDRMNG_CHANNEL_BUF_CAP : uint = 8;
 
-static MAX_ADDRESSES : uint = 2500;
-static BUCKETS : uint = 64;
+const MAX_ADDRESSES : uint = 2500;
+const BUCKETS : uint = 64;
 
-static MAX_ADDRS_PER_PEER : uint = (0.02*(MAX_ADDRESSES as f32)) as uint;
-static MAX_ADDRS_PER_BUCKET : uint = MAX_ADDRESSES/BUCKETS;
+const MAX_ADDRS_PER_PEER : uint = (0.02*(MAX_ADDRESSES as f32)) as uint;
+const MAX_ADDRS_PER_BUCKET : uint = MAX_ADDRESSES/BUCKETS;
 
-static ANNOUNCE_SOME_ADDRS_MIN : uint = 5;
-static ANNOUNCE_SOME_ADDRS_MAX : uint = 25;
+const ANNOUNCE_SOME_ADDRS_MIN : uint = 5;
+const ANNOUNCE_SOME_ADDRS_MAX : uint = 25;
 
-static ANNOUNCE_MANY_ADDRS_MIN : uint = 200;
-static ANNOUNCE_MANY_ADDRS_MAX : uint = 500;
+const ANNOUNCE_MANY_ADDRS_MIN : uint = 200;
+const ANNOUNCE_MANY_ADDRS_MAX : uint = 500;
 
-static PERIODIC_CLEANUP_M : uint = 20;
-static OLD_ADDRESS_AGE_M : uint = 3*60;
+const PERIODIC_CLEANUP_M : uint = 20;
+const OLD_ADDRESS_AGE_M : uint = 3*60;
 
 pub type AddrManagerChannel = DuplexChannel<AddrManagerRequest,AddrManagerReply>;
 
@@ -67,17 +66,17 @@ pub enum AddrManagerReply
 
 impl Show for AddrManagerRequest
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
         match *self
         {
-            AddrMngAddAddresses(ref peer, ref addrs) =>
+            AddrManagerRequest::AddrMngAddAddresses(ref peer, ref addrs) =>
                 write!(f,"{}: Adds Addresses: {}",peer,addrs),
-            AddrMngAddPeerChannel(_) =>
+            AddrManagerRequest::AddrMngAddPeerChannel(_) =>
                 write!(f,"New channel"),
-            AddrMngGetSomeAddresses =>
+            AddrManagerRequest::AddrMngGetSomeAddresses =>
                 write!(f,"Some addresses request"),
-            AddrMngGetManyAddresses =>
+            AddrManagerRequest::AddrMngGetManyAddresses =>
                 write!(f,"Many addresses request")
         }
     }
@@ -85,11 +84,12 @@ impl Show for AddrManagerRequest
 
 impl Show for AddrManagerReply
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
         match *self
         {
-            AddrMngAddresses(ref addrs) => write!(f,"Addresses: {}",addrs)
+            AddrManagerReply::AddrMngAddresses(ref addrs) =>
+                write!(f,"Addresses: {}",addrs)
         }
     }
 }
@@ -246,7 +246,7 @@ impl AddrManager
         {
             let socketaddr : &SocketAddr = &address.netaddr.addr.unwrap();
 
-            self.addresses.get_mut(bucket).remove(socketaddr);
+            self.addresses[bucket].remove(socketaddr);
             self.dec_peer_addresses(&address.peer);
         }
     }
@@ -256,7 +256,7 @@ impl AddrManager
         let bucket : uint = self.get_bucket_idx(socketaddr);
         let known_addr : Option<&Address>;
 
-        known_addr = self.addresses[bucket].find(socketaddr);
+        known_addr = self.addresses[bucket].get(socketaddr);
 
         known_addr.map(|address| address.netaddr.time.unwrap())
     }
@@ -269,12 +269,12 @@ impl AddrManager
         let new_addr : bool;
 
         /* We might be changing the peer of the address */
-        old = self.addresses[bucket].find(socketaddr).unwrap().clone();
+        old = self.addresses[bucket].get(socketaddr).unwrap().clone();
         self.dec_peer_addresses(&old.peer);
 
         assert!(old.netaddr.time.unwrap() < address.netaddr.time.unwrap());
 
-        new_addr = self.addresses.get_mut(bucket).insert(*socketaddr,address);
+        new_addr = self.addresses[bucket].insert(*socketaddr,address).is_none();
         self.inc_peer_addresses(&address.peer);
 
         ::logger::log_addr_mng_timestamp_update(&address.netaddr.addr.unwrap(),
@@ -312,7 +312,7 @@ impl AddrManager
         assert!(known_addr_time.is_none());
         assert!(!address.is_old());
 
-        new_addr = self.addresses.get_mut(bucket).insert(*socketaddr,address);
+        new_addr = self.addresses[bucket].insert(*socketaddr,address).is_none();
         self.inc_peer_addresses(&address.peer);
 
         assert!(new_addr);
@@ -330,7 +330,7 @@ impl AddrManager
             self.addrs_per_peer.insert(*peer,0);
         }
 
-        num = *self.addrs_per_peer.find(peer).unwrap() + 1;
+        num = *self.addrs_per_peer.get(peer).unwrap() + 1;
 
         self.addrs_per_peer.insert(*peer,num);
     }
@@ -341,7 +341,7 @@ impl AddrManager
 
         assert!(self.addrs_per_peer.contains_key(peer));
 
-        num = *self.addrs_per_peer.find(peer).unwrap() - 1;
+        num = *self.addrs_per_peer.get(peer).unwrap() - 1;
 
         if num > 0
         {
@@ -356,7 +356,7 @@ impl AddrManager
 
     fn allow_peer_to_add(&self, peer : &IpAddr) -> bool
     {
-        match self.addrs_per_peer.find(peer)
+        match self.addrs_per_peer.get(peer)
         {
             Some(num) => *num <= MAX_ADDRS_PER_PEER,
             None      => true
@@ -427,7 +427,7 @@ impl AddrManager
         num = rand_interval(ANNOUNCE_SOME_ADDRS_MIN,ANNOUNCE_SOME_ADDRS_MAX);
         addrs = self.get_addrs(num);
 
-        self.send(channelid,AddrMngAddresses(addrs));
+        self.send(channelid,AddrManagerReply::AddrMngAddresses(addrs));
     }
 
     fn handle_get_many_addrs(&self, channelid : uint)
@@ -438,7 +438,7 @@ impl AddrManager
         num = rand_interval(ANNOUNCE_MANY_ADDRS_MIN,ANNOUNCE_MANY_ADDRS_MAX);
         addrs = self.get_addrs(num);
 
-        self.send(channelid,AddrMngAddresses(addrs));
+        self.send(channelid,AddrManagerReply::AddrMngAddresses(addrs));
     }
 
     fn handle_request(&mut self,
@@ -449,11 +449,14 @@ impl AddrManager
 
         match request
         {
-            AddrMngAddAddresses(peer,addrs) =>
+            AddrManagerRequest::AddrMngAddAddresses(peer,addrs) =>
                 self.handle_add_addresses(peer,addrs),
-            AddrMngGetSomeAddresses  => self.handle_get_some_addrs(channelid),
-            AddrMngGetManyAddresses  => self.handle_get_many_addrs(channelid),
-            AddrMngAddPeerChannel(c) => self.handle_add_channel(c)
+            AddrManagerRequest::AddrMngGetSomeAddresses  =>
+                self.handle_get_some_addrs(channelid),
+            AddrManagerRequest::AddrMngGetManyAddresses  =>
+                self.handle_get_many_addrs(channelid),
+            AddrManagerRequest::AddrMngAddPeerChannel(c) =>
+                self.handle_add_channel(c)
         }
     }
 

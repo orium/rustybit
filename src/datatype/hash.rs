@@ -29,7 +29,7 @@ impl Index<uint, u8> for Hash
 
 impl Show for Hash
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
         write!(f, "{}",::crypto::to_hexstr(&self.hash))
     }

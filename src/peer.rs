@@ -7,16 +7,6 @@ use self::time::Timespec;
 use std::time::duration::Duration;
 
 use message::Message;
-use message::MsgVersion;
-use message::MsgVerAck;
-use message::MsgPing;
-use message::MsgPong;
-use message::MsgAddr;
-use message::MsgInv;
-use message::MsgGetData;
-use message::MsgReject;
-use message::MsgTx;
-use message::MsgGetAddr;
 
 use message::version::Version;
 use message::verack::VerAck;
@@ -37,10 +27,6 @@ use msgbuffer::MsgBuffer;
 use addrmng::AddrManagerChannel;
 use addrmng::AddrManagerRequest;
 use addrmng::AddrManagerReply;
-use addrmng::AddrMngAddAddresses;
-use addrmng::AddrMngGetSomeAddresses;
-use addrmng::AddrMngGetManyAddresses;
-use addrmng::AddrMngAddresses;
 
 macro_rules! some_ref_or(
     ($e:expr, $err:expr) => (match $e { Some(ref mut e) => e, None => return $err }))
@@ -73,22 +59,22 @@ impl PeerError
     {
         match *self
         {
-            ReadTimeout           => false,
-            ReadIncomplete        => false,
-            ReadMsgUnknownCommand => false,
-            _                     => true
+            PeerError::ReadTimeout           => false,
+            PeerError::ReadIncomplete        => false,
+            PeerError::ReadMsgUnknownCommand => false,
+            _                                => true
         }
     }
 }
 
-static PERIODIC_PERIOD_S : uint = 5;
+const PERIODIC_PERIOD_S : uint = 5;
 
-static PERIOD_PING_S : uint = 2*60;
-static PERIOD_TIMEOUT_CHECK_S : uint = 10;
-static PERIOD_ANNOUNCE_ADDRS_S : uint = 15*60;
-static PERIOD_REQUEST_ADDRS_S : uint = 30*60;
+const PERIOD_PING_S : uint = 2*60;
+const PERIOD_TIMEOUT_CHECK_S : uint = 10;
+const PERIOD_ANNOUNCE_ADDRS_S : uint = 15*60;
+const PERIOD_REQUEST_ADDRS_S : uint = 30*60;
 
-static TIMEOUT_S : uint = 10*60;
+const TIMEOUT_S : uint = 10*60;
 
 pub struct Peer
 {
@@ -102,8 +88,8 @@ pub struct Peer
     addrmng_channel : AddrManagerChannel
 }
 
-static TIMEOUT_CONNECT_MS : uint = 10000;
-static TIMEOUT_WRITE_MS : uint = 5*60*1000;
+const TIMEOUT_CONNECT_MS : uint = 10000;
+const TIMEOUT_WRITE_MS : uint = 5*60*1000;
 
 impl Peer
 {
@@ -128,7 +114,7 @@ impl Peer
 
         if maybesocket.is_err()
         {
-            return Err(ConnectError);
+            return Err(PeerError::ConnectError);
         }
 
         self.socket = Some(maybesocket.unwrap());
@@ -138,7 +124,7 @@ impl Peer
 
     fn send(&mut self, msg : &Vec<u8>) -> Result<(),PeerError>
     {
-        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(NotConnected));
+        let socket : &mut TcpStream = some_ref_or!(self.socket,Err(PeerError::NotConnected));
         let result;
 
         socket.set_write_timeout(Some(TIMEOUT_WRITE_MS as u64));
@@ -149,8 +135,8 @@ impl Peer
         {
             match result.err().unwrap().kind
             {
-                ::std::io::TimedOut  => return Err(WriteTimeout),
-                _                    => return Err(WriteIOError)
+                ::std::io::TimedOut  => return Err(PeerError::WriteTimeout),
+                _                    => return Err(PeerError::WriteIOError)
             }
         }
 
@@ -163,7 +149,7 @@ impl Peer
 
         try!(self.send(&version.serialize()));
 
-        ::logger::log_sent_msg(&self.addr,&MsgVersion(version));
+        ::logger::log_sent_msg(&self.addr,&Message::MsgVersion(version));
 
         Ok(())
     }
@@ -174,7 +160,7 @@ impl Peer
 
         try!(self.send(&verack.serialize()));
 
-        ::logger::log_sent_msg(&self.addr,&MsgVerAck(verack));
+        ::logger::log_sent_msg(&self.addr,&Message::MsgVerAck(verack));
 
         Ok(())
     }
@@ -192,7 +178,7 @@ impl Peer
 
         self.last_ping = Some(now);
 
-        ::logger::log_sent_msg(&self.addr,&MsgPing(ping));
+        ::logger::log_sent_msg(&self.addr,&Message::MsgPing(ping));
 
         Ok(())
     }
@@ -203,7 +189,7 @@ impl Peer
 
         try!(self.send(&pong.serialize()));
 
-        ::logger::log_sent_msg(&self.addr,&MsgPong(pong));
+        ::logger::log_sent_msg(&self.addr,&Message::MsgPong(pong));
 
         Ok(())
     }
@@ -214,7 +200,7 @@ impl Peer
 
         try!(self.send(&getdata.serialize()));
 
-        ::logger::log_sent_msg(&self.addr,&MsgGetData(getdata));
+        ::logger::log_sent_msg(&self.addr,&Message::MsgGetData(getdata));
 
         Ok(())
     }
@@ -225,7 +211,7 @@ impl Peer
 
         try!(self.send(&addr.serialize()));
 
-        ::logger::log_sent_msg(&self.addr,&MsgAddr(addr));
+        ::logger::log_sent_msg(&self.addr,&Message::MsgAddr(addr));
 
         Ok(())
     }
@@ -236,7 +222,7 @@ impl Peer
 
         try!(self.send(&getaddr.serialize()));
 
-        ::logger::log_sent_msg(&self.addr,&MsgGetAddr(getaddr));
+        ::logger::log_sent_msg(&self.addr,&Message::MsgGetAddr(getaddr));
 
         Ok(())
     }
@@ -269,7 +255,7 @@ impl Peer
 
         if addr.is_valid_addr()
         {
-            self.addr_mng_send(AddrMngAddAddresses(self.addr.ip,singleton_addrs));
+            self.addr_mng_send(AddrManagerRequest::AddrMngAddAddresses(self.addr.ip,singleton_addrs));
         }
     }
 
@@ -278,12 +264,12 @@ impl Peer
         /* Do not allow a peer send a version msg twice */
         if self.version.is_some()
         {
-            return Err(DoubleHandshake);
+            return Err(PeerError::DoubleHandshake);
         }
 
         if version.get_protocol_version() < ::config::PROTOCOL_VERSION_MIN
         {
-            return Err(UnsupportedProtoVersion);
+            return Err(PeerError::UnsupportedProtoVersion);
         }
 
         self.version = Some(version.clone());
@@ -292,14 +278,14 @@ impl Peer
 
         self.addr_mng_add_self();
 
-        ::logger::log_received_msg(&self.addr,&MsgVersion(version));
+        ::logger::log_received_msg(&self.addr,&Message::MsgVersion(version));
 
         Ok(())
     }
 
     fn handle_verack(&mut self, verack : VerAck) -> Result<(),PeerError>
     {
-        ::logger::log_received_msg(&self.addr,&MsgVerAck(verack));
+        ::logger::log_received_msg(&self.addr,&Message::MsgVerAck(verack));
 
         Ok(())
     }
@@ -308,7 +294,7 @@ impl Peer
     {
         try!(self.send_pong(ping.get_nounce()));
 
-        ::logger::log_received_msg(&self.addr,&MsgPing(ping));
+        ::logger::log_received_msg(&self.addr,&Message::MsgPing(ping));
 
         Ok(())
     }
@@ -327,7 +313,7 @@ impl Peer
 
         lag = now-then;
 
-        ::logger::log_received_msg(&self.addr,&MsgPong(pong));
+        ::logger::log_received_msg(&self.addr,&Message::MsgPong(pong));
 
         ::logger::log_lag(&self.addr,&lag);
 
@@ -338,12 +324,12 @@ impl Peer
     {
         let now : Timespec = time::now_utc().to_timespec();
 
-        self.addr_mng_send(AddrMngAddAddresses(self.addr.ip,
-                                               addr.get_addresses().clone()));
+        self.addr_mng_send(AddrManagerRequest::AddrMngAddAddresses(self.addr.ip,
+                                                                   addr.get_addresses().clone()));
 
         self.last_addr = Some(now);
 
-        ::logger::log_received_msg(&self.addr,&MsgAddr(addr));
+        ::logger::log_received_msg(&self.addr,&Message::MsgAddr(addr));
 
         Ok(())
     }
@@ -352,28 +338,28 @@ impl Peer
     {
         try!(self.send_getdata(inv.get_invvect()));
 
-        ::logger::log_received_msg(&self.addr,&MsgInv(inv));
+        ::logger::log_received_msg(&self.addr,&Message::MsgInv(inv));
 
         Ok(())
     }
 
     fn handle_getdata(&mut self, getdata : GetData) -> Result<(),PeerError>
     {
-        ::logger::log_received_msg(&self.addr,&MsgGetData(getdata));
+        ::logger::log_received_msg(&self.addr,&Message::MsgGetData(getdata));
 
         Ok(())
     }
 
     fn handle_reject(&mut self, reject : Reject) -> Result<(),PeerError>
     {
-        ::logger::log_received_msg(&self.addr,&MsgReject(reject));
+        ::logger::log_received_msg(&self.addr,&Message::MsgReject(reject));
 
         Ok(())
     }
 
     fn handle_tx(&mut self, tx : Tx) -> Result<(),PeerError>
     {
-        ::logger::log_received_msg(&self.addr,&MsgTx(tx));
+        ::logger::log_received_msg(&self.addr,&Message::MsgTx(tx));
 
         Ok(())
     }
@@ -382,7 +368,7 @@ impl Peer
     {
         try!(self.announce_addresses(true));
 
-        ::logger::log_received_msg(&self.addr,&MsgGetAddr(getaddr));
+        ::logger::log_received_msg(&self.addr,&Message::MsgGetAddr(getaddr));
 
         Ok(())
     }
@@ -392,14 +378,14 @@ impl Peer
         let request : AddrManagerRequest;
         let reply   : AddrManagerReply;
 
-        request = if many { AddrMngGetManyAddresses }
-                  else { AddrMngGetSomeAddresses };
+        request = if many { AddrManagerRequest::AddrMngGetManyAddresses }
+                  else { AddrManagerRequest::AddrMngGetSomeAddresses };
 
         reply = self.addr_mng_send_recv(request);
 
         match reply
         {
-            AddrMngAddresses(addrs) =>
+            AddrManagerReply::AddrMngAddresses(addrs) =>
             {
                 assert!(addrs.len() <= ::message::addr::MSG_ADDR_MAX);
 
@@ -427,7 +413,7 @@ impl Peer
 
             if now > last+Duration::seconds(TIMEOUT_S as i64)
             {
-                return Err(PingTimeout);
+                return Err(PeerError::PingTimeout);
             }
         }
 
@@ -472,10 +458,14 @@ impl Peer
 
                 result = match p.token()
                 {
-                    PeriodicPing         => self.periodic_sendping(),
-                    PeriodicTimeoutCheck => self.periodic_timeout_check(),
-                    PeriodicAnnounceAddresses => self.periodic_announce_addrs(),
-                    PeriodicRequestAddresses  => self.periodic_request_addrs()
+                    PeriodicToken::PeriodicPing         =>
+                        self.periodic_sendping(),
+                    PeriodicToken::PeriodicTimeoutCheck =>
+                        self.periodic_timeout_check(),
+                    PeriodicToken::PeriodicAnnounceAddresses =>
+                        self.periodic_announce_addrs(),
+                    PeriodicToken::PeriodicRequestAddresses  =>
+                        self.periodic_request_addrs()
                 };
 
                 match result
@@ -496,13 +486,13 @@ impl Peer
         let mut periodics : Vec<Periodic> = Vec::new();
 
         periodics.push(Periodic::new(Duration::seconds(PERIOD_PING_S as i64),
-                                     PeriodicPing));
+                                     PeriodicToken::PeriodicPing));
         periodics.push(Periodic::new(Duration::seconds(PERIOD_TIMEOUT_CHECK_S as i64),
-                                     PeriodicTimeoutCheck));
+                                     PeriodicToken::PeriodicTimeoutCheck));
         periodics.push(Periodic::new(Duration::seconds(PERIOD_ANNOUNCE_ADDRS_S as i64),
-                                     PeriodicAnnounceAddresses));
+                                     PeriodicToken::PeriodicAnnounceAddresses));
         periodics.push(Periodic::new(Duration::seconds(PERIOD_REQUEST_ADDRS_S as i64),
-                                     PeriodicRequestAddresses));
+                                     PeriodicToken::PeriodicRequestAddresses));
 
         periodics
     }
@@ -532,7 +522,7 @@ impl Peer
                 last_periodic = time::now_utc().to_timespec();
             }
 
-            maybemsg = buffer.read_message(some_ref_or!(self.socket,Err(NotConnected)));
+            maybemsg = buffer.read_message(some_ref_or!(self.socket,Err(PeerError::NotConnected)));
 
             if maybemsg.is_err()
             {
@@ -548,16 +538,16 @@ impl Peer
 
             result = match maybemsg.unwrap()
             {
-                MsgVersion(version) => self.handle_version(version),
-                MsgVerAck(verack)   => self.handle_verack(verack),
-                MsgPing(ping)       => self.handle_ping(ping),
-                MsgPong(pong)       => self.handle_pong(pong),
-                MsgAddr(addrs)      => self.handle_addr(addrs),
-                MsgInv(inv)         => self.handle_inv(inv),
-                MsgGetData(getdata) => self.handle_getdata(getdata),
-                MsgReject(reject)   => self.handle_reject(reject),
-                MsgTx(tx)           => self.handle_tx(tx),
-                MsgGetAddr(getaddr) => self.handle_getaddr(getaddr),
+                Message::MsgVersion(version) => self.handle_version(version),
+                Message::MsgVerAck(verack)   => self.handle_verack(verack),
+                Message::MsgPing(ping)       => self.handle_ping(ping),
+                Message::MsgPong(pong)       => self.handle_pong(pong),
+                Message::MsgAddr(addrs)      => self.handle_addr(addrs),
+                Message::MsgInv(inv)         => self.handle_inv(inv),
+                Message::MsgGetData(getdata) => self.handle_getdata(getdata),
+                Message::MsgReject(reject)   => self.handle_reject(reject),
+                Message::MsgTx(tx)           => self.handle_tx(tx),
+                Message::MsgGetAddr(getaddr) => self.handle_getaddr(getaddr),
             };
 
             match result

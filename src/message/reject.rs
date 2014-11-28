@@ -22,14 +22,14 @@ impl RejectType
     {
         match v
         {
-            0x01 => Some(RejectMalformed),
-            0x10 => Some(RejectInvalid),
-            0x11 => Some(RejectObsolete),
-            0x12 => Some(RejectDuplicate),
-            0x40 => Some(RejectNonstandard),
-            0x41 => Some(RejectDust),
-            0x42 => Some(RejectInsufficientFee),
-            0x43 => Some(RejectCheckpoint),
+            0x01 => Some(RejectType::RejectMalformed),
+            0x10 => Some(RejectType::RejectInvalid),
+            0x11 => Some(RejectType::RejectObsolete),
+            0x12 => Some(RejectType::RejectDuplicate),
+            0x40 => Some(RejectType::RejectNonstandard),
+            0x41 => Some(RejectType::RejectDust),
+            0x42 => Some(RejectType::RejectInsufficientFee),
+            0x43 => Some(RejectType::RejectCheckpoint),
             _    => None
         }
     }
@@ -96,9 +96,9 @@ impl Reject
 
 impl Show for Reject
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
-        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let width = f.width().unwrap_or(0);
         let space = String::from_str(" ").repeat(width);
 
         write!(f,"{}Reject {} {} \"{}\"", space, self.msg, self.typ, self.reason)

@@ -1,18 +1,6 @@
-extern crate time;
-
 use std::io::TcpStream;
 
 use message::Message;
-use message::MsgVersion;
-use message::MsgVerAck;
-use message::MsgPing;
-use message::MsgPong;
-use message::MsgAddr;
-use message::MsgInv;
-use message::MsgGetData;
-use message::MsgReject;
-use message::MsgTx;
-use message::MsgGetAddr;
 
 use message::version::Version;
 use message::verack::VerAck;
@@ -29,18 +17,10 @@ use message::header::Header;
 use message::header::HEADER_SIZE;
 
 use peer::PeerError;
-use peer::ReadEOF;
-use peer::ReadTimeout;
-use peer::ReadIncomplete;
-use peer::ReadIOError;
-use peer::ReadMsgPayloadTooBig;
-use peer::ReadMsgInvalidChecksum;
-use peer::ReadMsgWrongNetwork;
-use peer::ReadMsgUnknownCommand;
 
-static PAYLOAD_MAX_SIZE : uint = 4*(1<<20); /* 4MB */
+const PAYLOAD_MAX_SIZE : uint = 4*(1<<20); /* 4MB */
 
-static TIMEOUT_READ_MS : uint = 500;
+const TIMEOUT_READ_MS : uint = 500;
 
 pub struct MsgBuffer
 {
@@ -67,7 +47,7 @@ impl MsgBuffer
         {
             let dst = src-n;
 
-            *self.buf.get_mut(dst) = self.buf[src];
+            self.buf[dst] = self.buf[src];
         }
 
         self.buf.truncate(len-n);
@@ -87,9 +67,9 @@ impl MsgBuffer
             {
                 match result.err().unwrap().kind
                 {
-                    ::std::io::EndOfFile => return Err(ReadEOF),
-                    ::std::io::TimedOut  => return Err(ReadTimeout),
-                    _                    => return Err(ReadIOError)
+                    ::std::io::EndOfFile => return Err(PeerError::ReadEOF),
+                    ::std::io::TimedOut  => return Err(PeerError::ReadTimeout),
+                    _                    => return Err(PeerError::ReadIOError)
                 }
             }
 
@@ -98,7 +78,7 @@ impl MsgBuffer
             /* We fail to read the entire thing */
             if self.buf.len() < size
             {
-                return Err(ReadIncomplete);
+                return Err(PeerError::ReadIncomplete);
             }
 
             assert!(self.buf.len() == size);
@@ -127,7 +107,7 @@ impl MsgBuffer
 
         if header.get_payload_size() > PAYLOAD_MAX_SIZE
         {
-            return Err(ReadMsgPayloadTooBig);
+            return Err(PeerError::ReadMsgPayloadTooBig);
         }
 
         /* Read enoght to have the message payload */
@@ -142,12 +122,12 @@ impl MsgBuffer
 
         if ::crypto::checksum(self.buf.as_slice()) != header.get_checksum()
         {
-            return Err(ReadMsgInvalidChecksum);
+            return Err(PeerError::ReadMsgInvalidChecksum);
         }
 
         if header.get_network() != ::config::NETWORK
         {
-            return Err(ReadMsgWrongNetwork);
+            return Err(PeerError::ReadMsgWrongNetwork);
         }
 
         msg = match header.get_command().as_slice()
@@ -159,7 +139,7 @@ impl MsgBuffer
                 version = Version::unserialize(&self.buf,
                                                header.get_payload_size());
 
-                Ok(MsgVersion(version))
+                Ok(Message::MsgVersion(version))
             },
             "verack" =>
             {
@@ -167,7 +147,7 @@ impl MsgBuffer
 
                 verack = VerAck::unserialize(&self.buf);
 
-                Ok(MsgVerAck(verack))
+                Ok(Message::MsgVerAck(verack))
             },
             "ping" =>
             {
@@ -175,7 +155,7 @@ impl MsgBuffer
 
                 ping = Ping::unserialize(&self.buf);
 
-                Ok(MsgPing(ping))
+                Ok(Message::MsgPing(ping))
             },
             "pong" =>
             {
@@ -183,7 +163,7 @@ impl MsgBuffer
 
                 pong = Pong::unserialize(&self.buf);
 
-                Ok(MsgPong(pong))
+                Ok(Message::MsgPong(pong))
             },
             "addr" =>
             {
@@ -191,7 +171,7 @@ impl MsgBuffer
 
                 addr = Addr::unserialize(&self.buf);
 
-                Ok(MsgAddr(addr))
+                Ok(Message::MsgAddr(addr))
             },
             "inv" =>
             {
@@ -199,7 +179,7 @@ impl MsgBuffer
 
                 inv = Inv::unserialize(&self.buf);
 
-                Ok(MsgInv(inv))
+                Ok(Message::MsgInv(inv))
             },
             "getdata" =>
             {
@@ -207,7 +187,7 @@ impl MsgBuffer
 
                 getdata = GetData::unserialize(&self.buf);
 
-                Ok(MsgGetData(getdata))
+                Ok(Message::MsgGetData(getdata))
             },
             "reject" =>
             {
@@ -215,7 +195,7 @@ impl MsgBuffer
 
                 reject = Reject::unserialize(&self.buf);
 
-                Ok(MsgReject(reject))
+                Ok(Message::MsgReject(reject))
             },
             "tx" =>
             {
@@ -223,7 +203,7 @@ impl MsgBuffer
 
                 tx = Tx::unserialize(&self.buf);
 
-                Ok(MsgTx(tx))
+                Ok(Message::MsgTx(tx))
             },
             "getaddr" =>
             {
@@ -231,9 +211,9 @@ impl MsgBuffer
 
                 getaddr = GetAddr::unserialize(&self.buf);
 
-                Ok(MsgGetAddr(getaddr))
+                Ok(Message::MsgGetAddr(getaddr))
             },
-            _ => Err(ReadMsgUnknownCommand)
+            _ => Err(PeerError::ReadMsgUnknownCommand)
         };
 
         self.buf.clear();

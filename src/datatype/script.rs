@@ -14,7 +14,7 @@ impl Script
 
 impl Show for Script
 {
-    fn fmt(&self, _f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, _f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
         Ok(()) // XXX TODO
     }

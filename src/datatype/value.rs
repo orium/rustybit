@@ -12,11 +12,11 @@ pub enum Value
 
 impl Show for Value
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
         match *self
         {
-            Satoshi(v) => write!(f,"{}.{:05} m฿",v/100_000,v%100_000)
+            Value::Satoshi(v) => write!(f,"{}.{:05} m฿",v/100_000,v%100_000)
         }
     }
 }

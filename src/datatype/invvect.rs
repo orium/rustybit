@@ -1,8 +1,6 @@
 use std::fmt::Show;
 use std::fmt::Formatter;
 
-use std::clone::Clone;
-
 use datatype::hash::Hash;
 
 #[deriving(Clone)]
@@ -22,13 +20,13 @@ pub struct InvEntry
 
 impl Show for InvEntry
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
         match self.typ
         {
-            Error    => try!(write!(f, "ERROR ")),
-            MsgTx    => try!(write!(f, "TX    ")),
-            MsgBlock => try!(write!(f, "BLOCK "))
+            InvEntryType::Error    => try!(write!(f, "ERROR ")),
+            InvEntryType::MsgTx    => try!(write!(f, "TX    ")),
+            InvEntryType::MsgBlock => try!(write!(f, "BLOCK "))
         }
 
         write!(f,"{}",self.hash)
@@ -77,9 +75,9 @@ impl Index<uint, InvEntry> for InvVect
 
 impl Show for InvVect
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
-        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let width = f.width().unwrap_or(0);
         let space = String::from_str(" ").repeat(width);
 
         for i in range(0,self.entries.len())

@@ -99,8 +99,8 @@ impl Version
         relay = if unmarshalling.consumed() < size { unmarshalling.read_bool() }
                                                    else { true };
 
-        assert!(services == ::config::NoService as u64
-                || services == ::config::NodeNetwork as u64);
+        assert!(services == ::config::Service::NoService as u64
+                || services == ::config::Service::NodeNetwork as u64);
 
         Version
         {
@@ -119,9 +119,9 @@ impl Version
 
 impl Show for Version
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
-        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let width = f.width().unwrap_or(0);
         let space = String::from_str(" ").repeat(width);
 
         try!(write!(f, "{}Proto ver  : {}\n", space, self.proto_ver));

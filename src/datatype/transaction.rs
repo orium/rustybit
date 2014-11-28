@@ -38,9 +38,9 @@ impl OutPoint
 
 impl Show for OutPoint
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
-        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let width = f.width().unwrap_or(0);
         let space = String::from_str(" ").repeat(width);
 
         write!(f,"{}{} idx: {}",space,self.hash,self.index)
@@ -78,9 +78,9 @@ impl TxOut
 
 impl Show for TxOut
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
-        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let width = f.width().unwrap_or(0);
         let space = String::from_str(" ").repeat(width);
 
         try!(write!(f,"{}Value : {}\n",space,self.value));
@@ -130,9 +130,9 @@ impl TxIn
 
 impl Show for TxIn
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
-        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let width = f.width().unwrap_or(0);
         let space = String::from_str(" ").repeat(width);
 
         try!(write!(f,"{}PrevOut  : {}\n",space,self.prev_out));
@@ -158,11 +158,11 @@ impl TxLock
     {
         match v
         {
-            0                        => LockLocked,
-            1         ... 500000000  => LockBlock(v),
-            500000001 ... 0xfffffffe => LockTime(time::Timespec { sec: v as i64,
-                                                                  nsec: 0}),
-            0xffffffff               => LockUnlocked,
+            0                        => TxLock::LockLocked,
+            1         ... 500000000  => TxLock::LockBlock(v),
+            500000001 ... 0xfffffffe => TxLock::LockTime(time::Timespec { sec: v as i64,
+                                                                          nsec: 0}),
+            0xffffffff               => TxLock::LockUnlocked,
             _                        => unreachable!()
         }
     }
@@ -223,9 +223,9 @@ impl Transaction
 
 impl Show for Transaction
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
-        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let width = f.width().unwrap_or(0);
         let space = String::from_str(" ").repeat(width);
 
 

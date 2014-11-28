@@ -7,17 +7,17 @@ use self::openssl::crypto::hash::{SHA256,Hasher};
 
 pub fn sha256(data : &[u8]) -> [u8, ..32]
 {
-    let hasher : Hasher = Hasher::new(SHA256);
+    let mut hasher : Hasher = Hasher::new(SHA256);
     let mut hash : [u8, ..32] = [0u8, ..32];
-    let final;
+    let digest;
 
     hasher.update(data);
 
-    final = hasher.finalize();
+    digest = hasher.finalize();
 
     for i in range(0,32)
     {
-        hash[i] = final[i];
+        hash[i] = digest[i];
     }
 
     hash

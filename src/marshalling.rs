@@ -6,20 +6,16 @@ use std::io::net::ip::{IpAddr, Ipv4Addr, Ipv6Addr};
 use datatype::netaddr::NetAddr;
 use datatype::invvect::InvVect;
 use datatype::transaction::Transaction;
-use datatype::transaction::LockLocked;
-use datatype::transaction::LockUnlocked;
-use datatype::transaction::LockBlock;
-use datatype::transaction::LockTime;
+use datatype::transaction::TxLock;
 use datatype::transaction::TxIn;
 use datatype::transaction::TxOut;
-use datatype::transaction::TxLock;
 use datatype::transaction::OutPoint;
-use datatype::value::{Value,Satoshi};
+use datatype::value::Value;
 use datatype::script::Script;
 use datatype::hash::Hash;
 
-static VARSTR_MAX_LENGTH : uint = 256;
-static VARSTR_SAFE_CHARS : &'static str
+const VARSTR_MAX_LENGTH : uint = 256;
+const VARSTR_SAFE_CHARS : &'static str
     = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890 .,;_/:?@";
 
 /* TODO don't use Vec<u8>. use &[u8]
@@ -177,9 +173,9 @@ impl Marshalling
                 {
                     Ipv4Addr(b3, b2, b1, b0) =>
                     {
-                        self.write([0x00u8, ..10]);
-                        self.write([0xffu8, ..2]);
-                        self.write([b3,b2,b1,b0]);
+                        self.write(&[0x00u8, ..10]);
+                        self.write(&[0xffu8, ..2]);
+                        self.write(&[b3,b2,b1,b0]);
                     },
                     Ipv6Addr(..) => unimplemented!() /* TODO ipv6 */
                 };
@@ -190,9 +186,9 @@ impl Marshalling
             }
             None =>
             {
-                self.write([0u8, ..10]);
-                self.write([0xffu8, ..2]);
-                self.write([0u8, ..4]); /* ip */
+                self.write(&[0u8, ..10]);
+                self.write(&[0xffu8, ..2]);
+                self.write(&[0u8, ..4]); /* ip */
                 self.write_uint16(0);   /* port */
             }
         };
@@ -227,7 +223,7 @@ impl Marshalling
     {
         match *v
         {
-            Satoshi(v) => self.write_uint64(v)
+            Value::Satoshi(v) => self.write_uint64(v)
         }
     }
 
@@ -259,10 +255,10 @@ impl Marshalling
 
         match tx.get_lock()
         {
-            LockLocked       => self.write_uint32(0),
-            LockUnlocked     => self.write_uint32(0xffffffff),
-            LockBlock(block) => self.write_uint32(block),
-            LockTime(tm)     => self.write_uint32(tm.sec as u32)
+            TxLock::LockLocked       => self.write_uint32(0),
+            TxLock::LockUnlocked     => self.write_uint32(0xffffffff),
+            TxLock::LockBlock(block) => self.write_uint32(block),
+            TxLock::LockTime(tm)     => self.write_uint32(tm.sec as u32)
         }
     }
 
@@ -572,10 +568,10 @@ impl Unmarshalling
             let typ : ::datatype::invvect::InvEntryType;
 
             typ = match self.read_uint32() {
-                0 => ::datatype::invvect::Error,
-                1 => ::datatype::invvect::MsgTx,
-                2 => ::datatype::invvect::MsgBlock,
-                _ => fail!("invalid type of inventory entry")
+                0 => ::datatype::invvect::InvEntryType::Error,
+                1 => ::datatype::invvect::InvEntryType::MsgTx,
+                2 => ::datatype::invvect::InvEntryType::MsgBlock,
+                _ => panic!("invalid type of inventory entry")
             };
 
             invvec.add(::datatype::invvect::InvEntry {
@@ -599,7 +595,7 @@ impl Unmarshalling
 
     pub fn read_value(&mut self) -> Value
     {
-        Satoshi(self.read_uint64())
+        Value::Satoshi(self.read_uint64())
     }
 
     pub fn read_transaction(&mut self) -> Transaction

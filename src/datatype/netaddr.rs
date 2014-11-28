@@ -3,8 +3,6 @@ extern crate time;
 use std::fmt::Show;
 use std::fmt::Formatter;
 
-use std::clone::Clone;
-
 use std::io::net::ip::SocketAddr;
 use std::io::net::ip::Ipv4Addr;
 use std::io::net::ip::Ipv6Addr;
@@ -46,7 +44,7 @@ impl NetAddr
 
 impl Show for NetAddr
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
         match self.addr
         {

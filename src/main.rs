@@ -1,6 +1,5 @@
 #![feature(macro_rules)]
 
-extern crate sync;
 extern crate getopts;
 
 use std::io::net::ip::SocketAddr;
@@ -16,7 +15,6 @@ use addrmng::AddrManagerChannel;
 use addrmng::AddrManager;
 use addrmng::AddrManagerRequest;
 use addrmng::AddrManagerReply;
-use addrmng::AddrMngAddPeerChannel;
 
 mod config;
 mod datatype;
@@ -36,9 +34,9 @@ struct Options
     version : bool
 }
 
-pub static OPT_DESC_HELP : &'static str
+pub const OPT_DESC_HELP : &'static str
     = "Display this help and exit";
-pub static OPT_DESC_VERSION : &'static str
+pub const OPT_DESC_VERSION : &'static str
     = "Output version information and exit";
 
 #[allow(unused_must_use)]
@@ -67,12 +65,12 @@ fn parse_options() -> Option<Options>
                  optflag("v", "version", OPT_DESC_VERSION) ];
     let matches : getopts::Matches;
 
-    matches = match getopts::getopts(std::os::args().as_slice(), opts)
+    matches = match getopts::getopts(std::os::args().as_slice(), &opts)
     {
         Ok(m)  => m,
         Err(e) =>
         {
-            (write!(std::io::stderr(),"error: {}\n", e)).unwrap();
+            (write!(&mut std::io::stderr(),"error: {}\n", e)).unwrap();
             return None;
         }
     };
@@ -145,7 +143,7 @@ fn run_peers()
         let (channel_peer, channel_addrmng)
             = comm::sync_duplex_channel(addrmng::ADDRMNG_CHANNEL_BUF_CAP);
 
-        channel_us.sender.send(AddrMngAddPeerChannel(channel_addrmng));
+        channel_us.sender.send(AddrManagerRequest::AddrMngAddPeerChannel(channel_addrmng));
 
         spawn_thread_run_peer(*addrs,channel_peer);
     }

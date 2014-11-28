@@ -5,7 +5,7 @@ use message::header::Header;
 
 use datatype::netaddr::NetAddr;
 
-pub static MSG_ADDR_MAX : uint = 1000;
+pub const MSG_ADDR_MAX : uint = 1000;
 
 pub struct Addr
 {
@@ -86,9 +86,9 @@ impl Addr
 
 impl Show for Addr
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
-        let width = if f.width.is_some() { f.width.unwrap() } else { 0 };
+        let width = f.width().unwrap_or(0);
         let space = String::from_str(" ").repeat(width);
 
         try!(write!(f,"{}Addr:\n", space));

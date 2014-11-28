@@ -2,7 +2,7 @@ use std::fmt::Show;
 use std::fmt::Formatter;
 
 /* TODO inside Header */
-pub static HEADER_SIZE : uint = 24;
+pub const HEADER_SIZE : uint = 24;
 
 pub struct Header
 {
@@ -81,7 +81,7 @@ impl Header
 
 impl Show for Header
 {
-    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::FormatError>
+    fn fmt(&self, f : &mut Formatter) -> Result<(), ::std::fmt::Error>
     {
         try!(write!(f, "Network : {:08x}\n", self.network));
         try!(write!(f, "Command : {}\n", self.command));

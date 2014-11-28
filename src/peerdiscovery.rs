@@ -87,20 +87,20 @@ fn get_last_snapshot_getaddr_bitnodes_io() -> Result<String,()>
     let snapshot_index = "https://getaddr.bitnodes.io/api/v1/snapshots/";
     let root : json::Json;
     let results : &json::Json;
-    let snapshots : &json::JsonList;
+    let snapshots : &json::JsonArray;
     let lastest_snapshots_url : &json::Json;
 
     root = try!(json_from_url(snapshot_index.to_string()));
-    results = unwrap_err_nil!(root.find(&"results".to_string()));
+    results = unwrap_err_nil!(root.find("results"));
 
-    snapshots = unwrap_err_nil!(results.as_list());
+    snapshots = unwrap_err_nil!(results.as_array());
 
     if snapshots.len() < 1
     {
         return Err(());
     }
 
-    lastest_snapshots_url = unwrap_err_nil!(snapshots[0].find(&"url".to_string()));
+    lastest_snapshots_url = unwrap_err_nil!(snapshots[0].find("url"));
 
     Ok(unwrap_err_nil!(lastest_snapshots_url.as_string()).to_string())
 }
@@ -116,14 +116,14 @@ fn discover_getaddr_bitnodes_io() -> Vec<SocketAddr>
 
     root = try_emp_vec!(json_from_url(snapshot_url));
 
-    nodes = unwrap_emp_vec!(root.find(&"nodes".to_string()));
+    nodes = unwrap_emp_vec!(root.find("nodes"));
 
     for (addr, prop) in unwrap_emp_vec!(nodes.as_object()).iter()
     {
         let proto_ver;
         let sock_addr : SocketAddr;
 
-        proto_ver = unwrap_emp_vec!(unwrap_emp_vec!(prop.as_list())[0].as_u64());
+        proto_ver = unwrap_emp_vec!(unwrap_emp_vec!(prop.as_array())[0].as_u64());
 
         if (proto_ver as u32) < ::config::PROTOCOL_VERSION_MIN
         {
@@ -211,7 +211,7 @@ pub fn discover_peers(count : uint) -> Vec<SocketAddr>
     {
         let method = (::crypto::rng().gen::<uint>())%peers_by_method.len();
 
-        match peers_by_method.get_mut(method).pop()
+        match peers_by_method[method].pop()
         {
             Some(addr) => peers.push(addr),
             None       => ()

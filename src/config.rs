@@ -1,22 +1,23 @@
-pub static NAME : &'static str = "rustybit";
+pub const NAME : &'static str = "rustybit";
 
-pub static VERSION_MAJOR : u8 = 0;
-pub static VERSION_MINOR : u8 = 0;
-pub static VERSION_FIXES : u8 = 0;
+pub const VERSION_MAJOR : u8 = 0;
+pub const VERSION_MINOR : u8 = 0;
+pub const VERSION_FIXES : u8 = 0;
 
-pub static VERSION_SUFIX : Option<&'static str> = Some("dev");
+pub const VERSION_SUFIX : Option<&'static str> = Some("dev");
 
 pub enum Network
 {
     MainNet = 0xD9B4BEF9
 }
 
-pub static NETWORK : u32 = MainNet as u32; /* TODO This should be of type Network */
+/* TODO This should be of type Network */
+pub const NETWORK : u32 = Network::MainNet as u32;
 
-pub static PROTOCOL_VERSION : u32 = 70002;
+pub const PROTOCOL_VERSION : u32 = 70002;
 
 /* We reject peers with protocol versions smaller than this */
-pub static PROTOCOL_VERSION_MIN : u32 = 70002;
+pub const PROTOCOL_VERSION_MIN : u32 = 70002;
 
 pub enum Service
 {
@@ -26,11 +27,11 @@ pub enum Service
 
 pub type Services = u64;
 
-pub static SERVICES : Services = NodeNetwork as Services;
+pub const SERVICES : Services = Service::NodeNetwork as Services;
 
-pub static INITIAL_DISCOVERY_PEERS : uint = 30;
+pub const INITIAL_DISCOVERY_PEERS : uint = 30;
 
-pub static DEFAULT_PORT : u16 = 8333;
+pub const DEFAULT_PORT : u16 = 8333;
 
 pub fn version() -> String
 {
